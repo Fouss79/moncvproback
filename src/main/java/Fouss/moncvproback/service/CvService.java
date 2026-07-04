@@ -161,6 +161,98 @@ public class CvService {
 
         return cv;
     }
+    @Transactional
+    public CvFullDTO getCvFullByUser(Long userId) {
+
+        Cv cv = cvRepository.findByUserId(userId)
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("CV introuvable"));
+
+        CvFullDTO dto = new CvFullDTO();
+
+        dto.setNom(cv.getNom());
+        dto.setPrenom(cv.getPrenom());
+        dto.setTitre(cv.getTitre());
+        dto.setProfil(cv.getProfil());
+        dto.setCouleur(cv.getCouleur());
+        dto.setTemplate(cv.getTemplate());
+        dto.setPhotoUrl(cv.getPhotoUrl());
+
+        // CONTACT
+        ContactDTO contact = new ContactDTO();
+        contact.setEmail(cv.getEmail());
+        contact.setTelephone(cv.getTelephone());
+        contact.setAdresse(cv.getAdresse());
+        contact.setLinkedin(cv.getLinkedin());
+        contact.setGithub(cv.getGithub());
+        dto.setContact(contact);
+
+        // COMPETENCES
+        dto.setCompetences(
+                cv.getCompetences()
+                        .stream()
+                        .map(Competence::getNom)
+                        .toList()
+        );
+
+        // LANGUES
+        dto.setLangues(
+                cv.getLangues()
+                        .stream()
+                        .map(Langue::getNom)
+                        .toList()
+        );
+
+        // SOFT SKILLS
+        dto.setSoftSkills(
+                cv.getSoftSkills()
+                        .stream()
+                        .map(SoftSkill::getNom)
+                        .toList()
+        );
+
+        // LOISIRS
+        dto.setLoisirs(
+                cv.getLoisirs()
+                        .stream()
+                        .map(Loisir::getNom)
+                        .toList()
+        );
+
+        // FORMATIONS
+        dto.setFormations(
+                cv.getFormations()
+                        .stream()
+                        .map(f -> {
+                            FormationDTO fDto = new FormationDTO();
+                            fDto.setDiplome(f.getDiplome());
+                            fDto.setEcole(f.getEcole());
+                            fDto.setAnnee(f.getAnnee());
+                            return fDto;
+                        })
+                        .toList()
+        );
+
+        // EXPERIENCES
+        dto.setExperiences(
+                cv.getExperiences()
+                        .stream()
+                        .map(e -> {
+                            ExperienceDTO eDto = new ExperienceDTO();
+                            eDto.setPoste(e.getPoste());
+                            eDto.setEntreprise(e.getEntreprise());
+                            eDto.setDates(e.getDates());
+                            eDto.setDuree(e.getDuree());
+                            eDto.setResponsabilites(e.getResponsabilites());
+                            return eDto;
+                        })
+                        .toList()
+        );
+
+        return dto;
+    }
+
     private void saveCompetences(
             Cv cv,
             List<String> competences
@@ -279,20 +371,23 @@ public class CvService {
 
 
     }
-    private void saveContact(Cv cv, ContactDTO contact) {
+    private void saveContact(Cv cv, ContactDTO dto) {
 
-        if (contact == null) return;
+        if (dto == null) return;
 
-        cv.setEmail(contact.getEmail());
-        cv.setTelephone(contact.getTelephone());
-        cv.setAdresse(contact.getAdresse());
-        cv.setLinkedin(contact.getLinkedin());
-        cv.setGithub(contact.getGithub());
+        Contact contact = cv.getContact();
 
-        System.out.println(contact.getEmail());
-        System.out.println(contact.getTelephone());
+        if (contact == null) {
+            contact = new Contact();
+            contact.setCv(cv);
+        }
 
-        cvRepository.save(cv);
+        contact.setEmail(dto.getEmail());
+        contact.setTelephone(dto.getTelephone());
+        contact.setAdresse(dto.getAdresse());
+        contact.setLinkedin(dto.getLinkedin());
+        contact.setGithub(dto.getGithub());
+
+        cv.setContact(contact);
     }
-
 }

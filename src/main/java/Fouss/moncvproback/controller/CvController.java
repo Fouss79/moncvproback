@@ -103,6 +103,20 @@ public class CvController {
                 cvService.saveFullCv(userId, dto)
         );
     }
+    @GetMapping("/my-cv-full/{userId}")
+    public CvFullDTO getCvFull(@PathVariable Long userId) {
+        return cvService.getCvFullByUser(userId);
+    }
+    @GetMapping("/my-cv/full")
+    public CvFullDTO getMyCvFull(Authentication authentication) {
+
+        String email = authentication.getName();
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow();
+
+        return cvService.getCvFullByUser(user.getId());
+    }
     @GetMapping("/my-cv")
     public Optional<Cv> getMyCv(Authentication authentication) {
 
