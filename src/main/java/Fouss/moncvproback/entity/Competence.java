@@ -17,7 +17,7 @@ public class Competence {
     private Long id;
 
     private String nom;
-
+    private String niveau;
     @ManyToOne
     @JoinColumn(name = "cv_id")
     @JsonIgnore

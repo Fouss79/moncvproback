@@ -39,6 +39,19 @@ public class AuthController {
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         return ResponseEntity.ok(authService.register(request));
     }
+    @GetMapping("/activate")
+    public String activate(@RequestParam String token) {
+
+        User user = userRepository.findByVerificationToken(token)
+                .orElseThrow(() -> new RuntimeException("Token invalide"));
+
+        user.setEnabled(true);
+        user.setVerificationToken(null);
+
+        userRepository.save(user);
+
+        return "Compte activé avec succès";
+    }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {

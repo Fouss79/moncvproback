@@ -39,4 +39,6 @@ public class User {
     )
     @JsonIgnore
     private List<Cv> cvs;
+    private boolean enabled = false;
+    private String verificationToken;
 }

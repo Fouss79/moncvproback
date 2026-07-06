@@ -23,6 +23,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    private final EmailService emailService;
 
     // REGISTER
     public Map<String, Object> register(RegisterRequest request) {
@@ -31,18 +32,29 @@ public class AuthService {
         user.setNom(request.getNom());
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setEnabled(false); // ❗ important
+
+        String token = java.util.UUID.randomUUID().toString();
+        user.setVerificationToken(token);
 
         userRepository.save(user);
 
-        String token = jwtService.generateToken(user);
+        // 🔥 envoi email activation
+        String link = "https://ton-backend.com/api/auth/activate?token=" + token;
+
+        emailService.sendEmail(
+                user.getEmail(),
+                "Activation de ton compte MonCVPro",
+                "<h2>Bienvenue sur MonCVPro</h2>"
+                        + "<p>Clique sur le lien pour activer ton compte :</p>"
+                        + "<a href='" + link + "'>Activer mon compte</a>"
+        );
 
         Map<String, Object> response = new HashMap<>();
-        response.put("user", user);
-        response.put("token", token);
+        response.put("message", "Compte créé. Vérifie ton email pour activer ton compte.");
 
         return response;
     }
-
     // LOGIN
     public Map<String, Object> login(LoginRequest request) {
 
@@ -55,6 +67,10 @@ public class AuthService {
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!user.isEnabled()) {
+            throw new RuntimeException("Compte non activé. Vérifie ton email.");
+        }
 
         String token = jwtService.generateToken(user);
 

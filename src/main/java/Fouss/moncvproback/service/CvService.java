@@ -1,9 +1,6 @@
 package Fouss.moncvproback.service;
 
-import Fouss.moncvproback.dto.ContactDTO;
-import Fouss.moncvproback.dto.CvFullDTO;
-import Fouss.moncvproback.dto.ExperienceDTO;
-import Fouss.moncvproback.dto.FormationDTO;
+import Fouss.moncvproback.dto.*;
 import Fouss.moncvproback.entity.*;
 import Fouss.moncvproback.repository.*;
 import jakarta.transaction.Transactional;
@@ -140,13 +137,12 @@ public class CvService {
 
 
         // ⚠️ IMPORTANT : supprimer anciennes relations
-        cv.getCompetences().clear();
-        cv.getLangues().clear();
-        cv.getExperiences().clear();
-        cv.getFormations().clear();
-        cv.getSoftSkills().clear();
-        cv.getLoisirs().clear();
-
+        competenceRepository.deleteByCvId(cv.getId());
+        langueRepository.deleteByCvId(cv.getId());
+        softSkillRepository.deleteByCvId(cv.getId());
+        loisirRepository.deleteByCvId(cv.getId());
+        formationRepository.deleteByCvId(cv.getId());
+        experienceRepository.deleteByCvId(cv.getId());
         cvRepository.save(cv);
 
         // recréer
@@ -189,21 +185,31 @@ public class CvService {
         dto.setContact(contact);
 
         // COMPETENCES
+        // COMPETENCES
         dto.setCompetences(
                 cv.getCompetences()
                         .stream()
-                        .map(Competence::getNom)
+                        .map(c -> {
+                            CompetenceDTO competenceDTO = new CompetenceDTO();
+                            competenceDTO.setNom(c.getNom());
+                            competenceDTO.setNiveau(c.getNiveau());
+                            return competenceDTO;
+                        })
                         .toList()
         );
 
-        // LANGUES
+// LANGUES
         dto.setLangues(
                 cv.getLangues()
                         .stream()
-                        .map(Langue::getNom)
+                        .map(l -> {
+                            LangueDTO langueDTO = new LangueDTO();
+                            langueDTO.setNom(l.getNom());
+                            langueDTO.setNiveau(l.getNiveau());
+                            return langueDTO;
+                        })
                         .toList()
         );
-
         // SOFT SKILLS
         dto.setSoftSkills(
                 cv.getSoftSkills()
@@ -253,43 +259,38 @@ public class CvService {
         return dto;
     }
 
-    private void saveCompetences(
-            Cv cv,
-            List<String> competences
-    ) {
+    private void saveCompetences(Cv cv, List<CompetenceDTO> competences) {
 
-        if(competences == null) return;
+        if (competences == null) return;
 
-        for(String nom : competences){
+        for (CompetenceDTO dto : competences) {
 
             Competence competence = new Competence();
 
-            competence.setNom(nom);
+            competence.setNom(dto.getNom());
+            competence.setNiveau(dto.getNiveau());
+
             competence.setCv(cv);
 
             competenceRepository.save(competence);
         }
     }
-    private void saveLangues(
-            Cv cv,
-            List<String> langues
-    ) {
+    private void saveLangues(Cv cv, List<LangueDTO> langues) {
 
-        if(langues == null) return;
+        if (langues == null) return;
 
-        for(String nom : langues){
+        for (LangueDTO dto : langues) {
 
             Langue langue = new Langue();
 
-            langue.setNom(nom);
-            langue.setNiveau("Non précisé");
+            langue.setNom(dto.getNom());
+            langue.setNiveau(dto.getNiveau());
 
             langue.setCv(cv);
 
             langueRepository.save(langue);
         }
     }
-
     private void saveFormations(
             Cv cv,
             List<FormationDTO> formations

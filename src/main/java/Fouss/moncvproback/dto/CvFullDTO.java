@@ -17,9 +17,9 @@ public class CvFullDTO {
     private String photoUrl;
     private ContactDTO contact;
 
-    private List<String> competences;
+    private List<CompetenceDTO> competences;
+    private List<LangueDTO> langues;
     private List<String> softSkills;
-    private List<String> langues;
     private List<String> loisirs;
 
     private List<FormationDTO> formations;
