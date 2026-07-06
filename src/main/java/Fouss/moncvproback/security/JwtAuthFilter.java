@@ -31,10 +31,17 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
+        String path = request.getServletPath();
+
+        // ✅ BYPASS AUTH ROUTES
+        if (path.startsWith("/api/auth/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         final String authHeader = request.getHeader("Authorization");
 
         System.out.println("AUTH HEADER = " + authHeader);
-
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
@@ -44,12 +51,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String token = authHeader.substring(7);
 
         try {
-
             String username = jwtService.extractUsername(token);
 
-            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            if (username != null &&
+                    SecurityContextHolder.getContext().getAuthentication() == null) {
 
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                UserDetails userDetails =
+                        userDetailsService.loadUserByUsername(username);
 
                 if (jwtService.isTokenValid(token, username)) {
 
@@ -67,12 +75,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }
-            System.out.println("AUTH HEADER = " + authHeader);
-            System.out.println("TOKEN = " + token);
-            System.out.println("USERNAME = " + username);
+
         } catch (Exception e) {
             System.out.println("JWT ERROR = " + e.getMessage());
         }
 
         filterChain.doFilter(request, response);
-    }}
+    }
+}
