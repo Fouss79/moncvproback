@@ -40,7 +40,7 @@ public class AuthService {
         userRepository.save(user);
 
         // 🔥 envoi email activation
-        String link = "https://ton-backend.com/api/auth/activate?token=" + token;
+        String link = "https://https://moncvproback-11.onrender.com/api/auth/activate?token=" + token;
 
         emailService.sendEmail(
                 user.getEmail(),
