@@ -39,6 +39,9 @@ public class User {
     )
     @JsonIgnore
     private List<Cv> cvs;
+    @Column(nullable = false)
+    @Builder.Default
     private boolean enabled = false;
-    private String verificationToken;
-}
+
+    @Column(name = "verification_token")
+    private String verificationToken;}
