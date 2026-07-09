@@ -1,0 +1,40 @@
+package Fouss.moncvproback.service;
+
+import Fouss.moncvproback.dto.PaymentRequest;
+import Fouss.moncvproback.dto.PaymentResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
+
+@Service
+@RequiredArgsConstructor
+public class PaymentService {
+
+    private final WebClient webClient;
+
+
+    @Value("${geniuspay.api.url}")
+    private String apiUrl;
+
+    @Value("${geniuspay.api.key}")
+    private String apiKey;
+
+    @Value("${geniuspay.api.secret}")
+    private String apiSecret;
+
+
+    public PaymentResponse createPayment(PaymentRequest request) {
+
+        return webClient.post()
+                .uri(apiUrl)
+                .header("X-API-Key", apiKey)
+                .header("X-API-Secret", apiSecret)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .retrieve()
+                .bodyToMono(PaymentResponse.class)
+                .block();
+    }
+}
