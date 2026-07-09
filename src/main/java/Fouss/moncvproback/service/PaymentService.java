@@ -36,5 +36,4 @@ public class PaymentService {
                 .retrieve()
                 .bodyToMono(PaymentResponse.class)
                 .block();
-    }
-}
+    }}
