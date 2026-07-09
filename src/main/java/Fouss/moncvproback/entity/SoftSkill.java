@@ -1,5 +1,6 @@
 package Fouss.moncvproback.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
@@ -20,6 +21,6 @@ public class SoftSkill {
 
     @ManyToOne
     @JoinColumn(name = "cv_id")
-    @JsonIgnore
+    @JsonBackReference
     private Cv cv;
 }

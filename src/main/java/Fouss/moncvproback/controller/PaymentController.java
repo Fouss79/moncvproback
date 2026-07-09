@@ -21,7 +21,11 @@ public class PaymentController {
             @RequestBody PaymentRequest request
     ) {
 
+        System.out.println("PAYMENT REQUEST = " + request);
+
         PaymentResponse response = paymentService.createPayment(request);
+
+        System.out.println("GENIUSPAY RESPONSE = " + response);
 
         return ResponseEntity.ok(response);
     }

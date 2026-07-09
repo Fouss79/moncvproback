@@ -1,5 +1,6 @@
 package Fouss.moncvproback.entity;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -45,8 +46,11 @@ public class Cv {
 
 
     // 📚 sections CV
+
     @OneToMany(mappedBy = "cv", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
     private List<Experience> experiences;
+
 
     @OneToMany(mappedBy = "cv", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Formation> formations;

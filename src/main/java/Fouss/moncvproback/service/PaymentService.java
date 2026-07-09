@@ -2,6 +2,7 @@ package Fouss.moncvproback.service;
 
 import Fouss.moncvproback.dto.PaymentRequest;
 import Fouss.moncvproback.dto.PaymentResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -34,6 +35,16 @@ public class PaymentService {
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .retrieve()
-                .bodyToMono(PaymentResponse.class)
+                .bodyToMono(String.class)
+                .map(json -> {
+                    System.out.println("REPONSE BRUTE GENIUSPAY = " + json);
+
+                    try {
+                        ObjectMapper mapper = new ObjectMapper();
+                        return mapper.readValue(json, PaymentResponse.class);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                })
                 .block();
     }}
