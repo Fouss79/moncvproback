@@ -35,8 +35,8 @@ public class PaymentService {
     public PaymentResponse createPayment(PaymentRequest request) {
 
         // Ajout des URLs de retour avant l'envoi à GeniusPay
-        request.setSuccessUrl(successUrl);
-        request.setErrorUrl(errorUrl);
+        request.setSuccess_url(successUrl);
+        request.setError_url(errorUrl);
 
         System.out.println("PAYMENT REQUEST = " + request);
 

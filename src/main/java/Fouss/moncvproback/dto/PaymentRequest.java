@@ -12,8 +12,8 @@ public class PaymentRequest {
     private String paymentMethod;
     private String description;
     private Customer customer;
-    private String successUrl;
-    private String errorUrl;
+    private String success_url;
+    private String error_url;
     private Map<String, String> metadata;
 
 
