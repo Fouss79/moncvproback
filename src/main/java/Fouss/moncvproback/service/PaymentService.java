@@ -25,8 +25,20 @@ public class PaymentService {
     @Value("${geniuspay.api.secret}")
     private String apiSecret;
 
+    @Value("${payment.success.url}")
+    private String successUrl;
+
+    @Value("${payment.error.url}")
+    private String errorUrl;
+
 
     public PaymentResponse createPayment(PaymentRequest request) {
+
+        // Ajout des URLs de retour avant l'envoi à GeniusPay
+        request.setSuccessUrl(successUrl);
+        request.setErrorUrl(errorUrl);
+
+        System.out.println("PAYMENT REQUEST = " + request);
 
         return webClient.post()
                 .uri(apiUrl)
@@ -47,4 +59,5 @@ public class PaymentService {
                     }
                 })
                 .block();
-    }}
+    }
+}

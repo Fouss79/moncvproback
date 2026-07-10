@@ -1,6 +1,8 @@
 package Fouss.moncvproback.dto;
 
 import lombok.Data;
+import lombok.Value;
+
 import java.util.Map;
 
 @Data
@@ -10,6 +12,8 @@ public class PaymentRequest {
     private String paymentMethod;
     private String description;
     private Customer customer;
+    private String successUrl;
+    private String errorUrl;
     private Map<String, String> metadata;
 
 
