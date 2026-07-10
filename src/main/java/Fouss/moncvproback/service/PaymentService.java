@@ -2,6 +2,8 @@ package Fouss.moncvproback.service;
 
 import Fouss.moncvproback.dto.PaymentRequest;
 import Fouss.moncvproback.dto.PaymentResponse;
+import Fouss.moncvproback.entity.Payment;
+import Fouss.moncvproback.repository.PaymentRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,11 +11,14 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.LocalDateTime;
+
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
 
     private final WebClient webClient;
+    private final PaymentRepository paymentRepository;
 
 
     @Value("${geniuspay.api.url}")
@@ -55,7 +60,25 @@ public class PaymentService {
 
                     try {
                         ObjectMapper mapper = new ObjectMapper();
-                        return mapper.readValue(json, PaymentResponse.class);
+                        PaymentResponse response = mapper.readValue(json, PaymentResponse.class);
+
+                        if (response.getData() != null) {
+
+                            Payment payment = new Payment();
+
+                            payment.setReference(response.getData().getReference());
+                            payment.setAmount(response.getData().getAmount());
+                            payment.setCurrency(response.getData().getCurrency());
+                            payment.setGateway(response.getData().getGateway());
+                            payment.setPaymentMethod(request.getPaymentMethod());
+                            payment.setDescription(request.getDescription());
+                            payment.setStatus("PENDING");
+                            payment.setCustomerEmail(request.getCustomer().getEmail());
+
+                            paymentRepository.save(payment);
+                        }
+
+                        return response;
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
@@ -87,12 +110,21 @@ public class PaymentService {
                         if (response.getData() == null) {
                             throw new RuntimeException("Aucune information de paiement reçue.");
                         }
-
                         if (!"completed".equalsIgnoreCase(response.getData().getStatus())) {
                             throw new RuntimeException(
                                     "Le paiement est en état : " + response.getData().getStatus()
                             );
                         }
+
+                        Payment payment = paymentRepository
+                                .findByReference(reference)
+                                .orElseThrow(() -> new RuntimeException("Paiement introuvable"));
+
+
+                        payment.setStatus("COMPLETED");
+                        payment.setCompletedAt(LocalDateTime.now());
+
+                        paymentRepository.save(payment);
 
                         return response;
 
