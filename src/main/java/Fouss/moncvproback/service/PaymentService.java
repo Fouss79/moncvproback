@@ -30,6 +30,8 @@ public class PaymentService {
 
     @Value("${payment.error.url}")
     private String errorUrl;
+    @Value("${geniuspay.api.verify-url}")
+    private String verifyUrl;
 
 
     public PaymentResponse createPayment(PaymentRequest request) {
@@ -60,4 +62,43 @@ public class PaymentService {
                 })
                 .block();
     }
-}
+    public PaymentResponse verifyPayment(String reference) {
+
+        return webClient.get()
+                .uri(verifyUrl + "/" + reference)
+                .header("X-API-Key", apiKey)
+                .header("X-API-Secret", apiSecret)
+                .retrieve()
+                .bodyToMono(String.class)
+                .map(json -> {
+
+                    System.out.println("VERIFICATION GENIUSPAY = " + json);
+
+                    try {
+                        ObjectMapper mapper = new ObjectMapper();
+
+                        PaymentResponse response =
+                                mapper.readValue(json, PaymentResponse.class);
+
+                        if (!Boolean.TRUE.equals(response.getSuccess())) {
+                            throw new RuntimeException("La vérification du paiement a échoué.");
+                        }
+
+                        if (response.getData() == null) {
+                            throw new RuntimeException("Aucune information de paiement reçue.");
+                        }
+
+                        if (!"completed".equalsIgnoreCase(response.getData().getStatus())) {
+                            throw new RuntimeException(
+                                    "Le paiement est en état : " + response.getData().getStatus()
+                            );
+                        }
+
+                        return response;
+
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                })
+                .block();
+    }}

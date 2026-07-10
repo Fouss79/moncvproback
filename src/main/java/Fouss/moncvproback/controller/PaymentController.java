@@ -5,6 +5,7 @@ import Fouss.moncvproback.dto.PaymentResponse;
 import Fouss.moncvproback.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -28,5 +29,11 @@ public class PaymentController {
         System.out.println("GENIUSPAY RESPONSE = " + response);
 
         return ResponseEntity.ok(response);
+    }
+    @GetMapping("/verify")
+    public ResponseEntity<PaymentResponse> verifyPayment(
+            @RequestParam String reference) {
+
+        return ResponseEntity.ok(paymentService.verifyPayment(reference));
     }
 }

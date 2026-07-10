@@ -28,7 +28,18 @@ public class PaymentResponse {
 
         private String currency;
 
+        private Integer fees;
+
+        @JsonProperty("net_amount")
+        private Integer netAmount;
+
         private String status;
+
+        @JsonProperty("payment_method")
+        private String paymentMethod;
+
+        @JsonProperty("payment_provider")
+        private String paymentProvider;
 
         private String gateway;
 
@@ -37,6 +48,14 @@ public class PaymentResponse {
         @JsonProperty("checkout_url")
         private String paymentUrl;
 
+        @JsonProperty("success_url")
+        private String successUrl;
+
+        @JsonProperty("error_url")
+        private String errorUrl;
+
+        @JsonProperty("completed_at")
+        private String completedAt;
+
         private Map<String, Object> metadata;
-    }
-}
+    }}
