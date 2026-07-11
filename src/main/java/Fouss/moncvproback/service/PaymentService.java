@@ -136,6 +136,10 @@ public class PaymentService {
 
             JsonNode data = json.get("data");
 
+            if (data == null || data.get("reference") == null) {
+                throw new RuntimeException("Référence paiement absente");
+            }
+
             String reference = data.get("reference").asText();
 
 
@@ -148,7 +152,7 @@ public class PaymentService {
 
             if ("payment.success".equals(event)) {
 
-                payment.setStatus("SUCCESS");
+                payment.setStatus("COMPLETED");
                 payment.setCompletedAt(LocalDateTime.now());
 
             }

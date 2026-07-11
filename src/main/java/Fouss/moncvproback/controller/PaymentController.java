@@ -38,8 +38,19 @@ public class PaymentController {
             @RequestBody String payload
     ) {
 
-        System.out.println("HEADERS WEBHOOK = " + headers);
-        System.out.println("PAYLOAD WEBHOOK = " + payload);
+        String event = headers.get("x-webhook-event");
+
+        if (event == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        if ("webhook.test".equals(event)) {
+            return ResponseEntity.ok().build();
+        }
+        System.out.println("EVENT = " + event);
+        System.out.println("PAYLOAD = " + payload);
+
+        paymentService.handleWebhook(event, payload);
 
         return ResponseEntity.ok().build();
     }
