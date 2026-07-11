@@ -136,7 +136,6 @@ public class PaymentService {
             JsonNode data = json.get("data");
 
             String reference = data.get("reference").asText();
-            String status = data.get("status").asText();
 
 
             Payment payment = paymentRepository
@@ -146,14 +145,16 @@ public class PaymentService {
                     );
 
 
-            if ("payment.success".equals(event)
-                    && "completed".equalsIgnoreCase(status)) {
+            if ("payment.success".equals(event)) {
 
                 payment.setStatus("SUCCESS");
+                payment.setCompletedAt(LocalDateTime.now());
 
-            } else if ("payment.failed".equals(event)) {
+            }
+            else if ("payment.failed".equals(event)) {
 
                 payment.setStatus("FAILED");
+
             }
 
 
@@ -161,7 +162,6 @@ public class PaymentService {
 
 
         } catch(Exception e) {
-
             throw new RuntimeException(e);
         }
     }
