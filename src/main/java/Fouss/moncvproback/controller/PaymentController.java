@@ -2,6 +2,7 @@ package Fouss.moncvproback.controller;
 
 import Fouss.moncvproback.dto.PaymentRequest;
 import Fouss.moncvproback.dto.PaymentResponse;
+import Fouss.moncvproback.dto.PaymentStatusResponse;
 import Fouss.moncvproback.entity.Payment;
 import Fouss.moncvproback.repository.PaymentRepository;
 import Fouss.moncvproback.service.PaymentService;
@@ -45,8 +46,15 @@ public class PaymentController {
         return ResponseEntity.ok().build();
     }
     @GetMapping("/status")
-    public Payment getStatus(@RequestParam String reference) {
-        return paymentService.getPaymentStatus(reference);
+    public PaymentStatusResponse getStatus(
+            @RequestParam String reference) {
+
+        Payment payment = paymentService.getPaymentStatus(reference);
+
+        return new PaymentStatusResponse(
+                payment.getReference(),
+                payment.getStatus()
+        );
     }
 
 }
