@@ -63,6 +63,18 @@ public class PaymentService {
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .retrieve()
+
+                .onStatus(
+                        status -> status.isError(),
+                        response -> response.bodyToMono(String.class)
+                                .map(error -> {
+                                    System.out.println("ERREUR GENIUSPAY = " + error);
+                                    return new RuntimeException(
+                                            "Erreur GeniusPay : " + error
+                                    );
+                                })
+                )
+
                 .bodyToMono(String.class)
                 .map(json -> {
                     System.out.println("REPONSE BRUTE GENIUSPAY = " + json);
@@ -72,60 +84,15 @@ public class PaymentService {
                         PaymentResponse response =
                                 mapper.readValue(json, PaymentResponse.class);
 
-
-                        if(response.getData() != null){
-
-                            User user = userRepository
-                                    .findByEmail(authentication.getName())
-                                    .orElseThrow();
-
-
-                            Payment payment = new Payment();
-
-                            payment.setReference(
-                                    response.getData().getReference()
-                            );
-
-                            payment.setAmount(
-                                    response.getData().getAmount()
-                            );
-
-                            payment.setCurrency(
-                                    response.getData().getCurrency()
-                            );
-
-                            payment.setGateway(
-                                    response.getData().getGateway()
-                            );
-
-                            payment.setPaymentMethod(
-                                    request.getPaymentMethod()
-                            );
-
-                            payment.setDescription(
-                                    request.getDescription()
-                            );
-
-                            payment.setStatus("PENDING");
-
-                            payment.setCustomerEmail(
-                                    request.getCustomer().getEmail()
-                            );
-
-                            payment.setUser(user);
-
-
-                            paymentRepository.save(payment);
-                        }
-
+                        // reste de ton code
 
                         return response;
+
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
                 })
-                .block();
-    }
+                .block();}
     public void handleWebhook(String event, String payload) {
 
         try {
@@ -176,4 +143,4 @@ public class PaymentService {
                 .orElseThrow(() ->
                         new RuntimeException("Paiement introuvable"));
     }
-    }
+}
