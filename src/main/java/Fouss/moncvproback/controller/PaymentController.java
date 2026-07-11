@@ -35,11 +35,14 @@ public class PaymentController {
     @PostMapping("/webhook")
     public ResponseEntity<?> webhook(
             @RequestHeader(value = "X-Webhook-Event", required = false) String event,
+            @RequestHeader(value = "X-Webhook-Secret", required = false) String secret,
             @RequestBody String payload
     ) {
 
         System.out.println("WEBHOOK EVENT = " + event);
+        System.out.println("WEBHOOK SECRET = " + secret);
         System.out.println("WEBHOOK PAYLOAD = " + payload);
+
 
         paymentService.handleWebhook(event, payload);
 

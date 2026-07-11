@@ -42,7 +42,8 @@ public class PaymentService {
     private String errorUrl;
     @Value("${geniuspay.api.verify-url}")
     private String verifyUrl;
-
+    @Value("${geniuspay.webhook.secret}")
+    private String webhookSecret;
 
     public PaymentResponse createPayment(
             PaymentRequest request,
