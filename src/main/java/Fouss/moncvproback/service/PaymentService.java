@@ -48,7 +48,7 @@ public class PaymentService {
     public PaymentResponse createPayment(
             PaymentRequest request,
             Authentication authentication
-    ){
+    ) {
 
         // Ajout des URLs de retour avant l'envoi à GeniusPay
         request.setSuccess_url(successUrl);
@@ -64,6 +64,7 @@ public class PaymentService {
                 .bodyValue(request)
                 .retrieve()
 
+                // Capture les erreurs GeniusPay (400, 401, 500...)
                 .onStatus(
                         status -> status.isError(),
                         response -> response.bodyToMono(String.class)
@@ -76,23 +77,88 @@ public class PaymentService {
                 )
 
                 .bodyToMono(String.class)
+
                 .map(json -> {
+
                     System.out.println("REPONSE BRUTE GENIUSPAY = " + json);
 
                     try {
+
                         ObjectMapper mapper = new ObjectMapper();
+
                         PaymentResponse response =
                                 mapper.readValue(json, PaymentResponse.class);
 
-                        // reste de ton code
+
+                        if (response.getData() != null) {
+
+                            User user = userRepository
+                                    .findByEmail(authentication.getName())
+                                    .orElseThrow(() ->
+                                            new RuntimeException("Utilisateur introuvable")
+                                    );
+
+
+                            Payment payment = new Payment();
+
+                            payment.setReference(
+                                    response.getData().getReference()
+                            );
+
+                            payment.setAmount(
+                                    response.getData().getAmount()
+                            );
+
+                            payment.setCurrency(
+                                    response.getData().getCurrency()
+                            );
+
+                            payment.setGateway(
+                                    response.getData().getGateway()
+                            );
+
+                            payment.setPaymentMethod(
+                                    request.getPaymentMethod()
+                            );
+
+                            payment.setDescription(
+                                    request.getDescription()
+                            );
+
+                            payment.setStatus("PENDING");
+
+                            payment.setCustomerEmail(
+                                    request.getCustomer().getEmail()
+                            );
+
+                            payment.setUser(user);
+
+
+                            paymentRepository.save(payment);
+
+                            System.out.println(
+                                    "PAIEMENT ENREGISTRE : "
+                                            + payment.getReference()
+                            );
+                        }
+
 
                         return response;
 
+
                     } catch (Exception e) {
+
+                        System.out.println(
+                                "ERREUR PARSING REPONSE GENIUSPAY = "
+                                        + e.getMessage()
+                        );
+
                         throw new RuntimeException(e);
                     }
+
                 })
-                .block();}
+                .block();
+    }
     public void handleWebhook(String event, String payload) {
 
         try {
