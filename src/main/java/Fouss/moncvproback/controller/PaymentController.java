@@ -2,6 +2,8 @@ package Fouss.moncvproback.controller;
 
 import Fouss.moncvproback.dto.PaymentRequest;
 import Fouss.moncvproback.dto.PaymentResponse;
+import Fouss.moncvproback.entity.Payment;
+import Fouss.moncvproback.repository.PaymentRepository;
 import Fouss.moncvproback.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private PaymentRepository paymentRepository;
 
 
     @PostMapping("/create")
@@ -27,14 +30,7 @@ public class PaymentController {
     }
 
 
-    @GetMapping("/verify")
-    public ResponseEntity<PaymentResponse> verifyPayment(
-            @RequestParam String reference) {
 
-        return ResponseEntity.ok(
-                paymentService.verifyPayment(reference)
-        );
-    }
     @PostMapping("/webhook")
     public ResponseEntity<?> webhook(
             @RequestHeader(value = "X-Webhook-Event", required = false) String event,
@@ -47,6 +43,10 @@ public class PaymentController {
         paymentService.handleWebhook(event, payload);
 
         return ResponseEntity.ok().build();
+    }
+    @GetMapping("/status")
+    public Payment getStatus(@RequestParam String reference) {
+        return paymentService.getPaymentStatus(reference);
     }
 
 }
