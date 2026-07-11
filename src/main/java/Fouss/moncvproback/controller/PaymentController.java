@@ -11,6 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/payments")
 @RequiredArgsConstructor
@@ -32,31 +34,15 @@ public class PaymentController {
 
     @PostMapping("/webhook")
     public ResponseEntity<?> webhook(
-            @RequestHeader(value = "X-Webhook-Event", required = false) String event,
-            @RequestBody(required = false) String payload
+            @RequestHeader Map<String,String> headers,
+            @RequestBody String payload
     ) {
 
-        try {
+        System.out.println("HEADERS WEBHOOK = " + headers);
+        System.out.println("PAYLOAD WEBHOOK = " + payload);
 
-            System.out.println("========== WEBHOOK RECU ==========");
-            System.out.println("EVENT = " + event);
-            System.out.println("PAYLOAD = " + payload);
-
-            paymentService.handleWebhook(event, payload);
-
-            return ResponseEntity.ok().build();
-
-        } catch(Exception e) {
-
-            e.printStackTrace();
-
-            return ResponseEntity
-                    .status(500)
-                    .body(e.getMessage());
-        }
+        return ResponseEntity.ok().build();
     }
-
-    
     @GetMapping("/status")
     public PaymentStatusResponse getStatus(
             @RequestParam String reference) {
