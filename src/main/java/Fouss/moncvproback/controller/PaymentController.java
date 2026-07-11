@@ -30,24 +30,33 @@ public class PaymentController {
         );
     }
 
-
-
     @PostMapping("/webhook")
     public ResponseEntity<?> webhook(
             @RequestHeader(value = "X-Webhook-Event", required = false) String event,
-            @RequestHeader(value = "X-Webhook-Secret", required = false) String secret,
-            @RequestBody String payload
+            @RequestBody(required = false) String payload
     ) {
 
-        System.out.println("WEBHOOK EVENT = " + event);
-        System.out.println("WEBHOOK SECRET = " + secret);
-        System.out.println("WEBHOOK PAYLOAD = " + payload);
+        try {
 
+            System.out.println("========== WEBHOOK RECU ==========");
+            System.out.println("EVENT = " + event);
+            System.out.println("PAYLOAD = " + payload);
 
-        paymentService.handleWebhook(event, payload);
+            paymentService.handleWebhook(event, payload);
 
-        return ResponseEntity.ok().build();
+            return ResponseEntity.ok().build();
+
+        } catch(Exception e) {
+
+            e.printStackTrace();
+
+            return ResponseEntity
+                    .status(500)
+                    .body(e.getMessage());
+        }
     }
+
+    
     @GetMapping("/status")
     public PaymentStatusResponse getStatus(
             @RequestParam String reference) {
