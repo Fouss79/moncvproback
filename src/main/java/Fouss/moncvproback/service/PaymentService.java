@@ -3,11 +3,14 @@ package Fouss.moncvproback.service;
 import Fouss.moncvproback.dto.PaymentRequest;
 import Fouss.moncvproback.dto.PaymentResponse;
 import Fouss.moncvproback.entity.Payment;
+import Fouss.moncvproback.entity.User;
 import Fouss.moncvproback.repository.PaymentRepository;
+import Fouss.moncvproback.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -19,6 +22,7 @@ public class PaymentService {
 
     private final WebClient webClient;
     private final PaymentRepository paymentRepository;
+    private final UserRepository userRepository;
 
 
     @Value("${geniuspay.api.url}")
@@ -39,7 +43,10 @@ public class PaymentService {
     private String verifyUrl;
 
 
-    public PaymentResponse createPayment(PaymentRequest request) {
+    public PaymentResponse createPayment(
+            PaymentRequest request,
+            Authentication authentication
+    ){
 
         // Ajout des URLs de retour avant l'envoi à GeniusPay
         request.setSuccess_url(successUrl);
@@ -60,23 +67,55 @@ public class PaymentService {
 
                     try {
                         ObjectMapper mapper = new ObjectMapper();
-                        PaymentResponse response = mapper.readValue(json, PaymentResponse.class);
+                        PaymentResponse response =
+                                mapper.readValue(json, PaymentResponse.class);
 
-                        if (response.getData() != null) {
+
+                        if(response.getData() != null){
+
+                            User user = userRepository
+                                    .findByEmail(authentication.getName())
+                                    .orElseThrow();
+
 
                             Payment payment = new Payment();
 
-                            payment.setReference(response.getData().getReference());
-                            payment.setAmount(response.getData().getAmount());
-                            payment.setCurrency(response.getData().getCurrency());
-                            payment.setGateway(response.getData().getGateway());
-                            payment.setPaymentMethod(request.getPaymentMethod());
-                            payment.setDescription(request.getDescription());
+                            payment.setReference(
+                                    response.getData().getReference()
+                            );
+
+                            payment.setAmount(
+                                    response.getData().getAmount()
+                            );
+
+                            payment.setCurrency(
+                                    response.getData().getCurrency()
+                            );
+
+                            payment.setGateway(
+                                    response.getData().getGateway()
+                            );
+
+                            payment.setPaymentMethod(
+                                    request.getPaymentMethod()
+                            );
+
+                            payment.setDescription(
+                                    request.getDescription()
+                            );
+
                             payment.setStatus("PENDING");
-                            payment.setCustomerEmail(request.getCustomer().getEmail());
+
+                            payment.setCustomerEmail(
+                                    request.getCustomer().getEmail()
+                            );
+
+                            payment.setUser(user);
+
 
                             paymentRepository.save(payment);
                         }
+
 
                         return response;
                     } catch (Exception e) {

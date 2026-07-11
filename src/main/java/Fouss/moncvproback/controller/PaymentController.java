@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/payments")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class PaymentController {
 
     private final PaymentService paymentService;
@@ -19,21 +18,21 @@ public class PaymentController {
 
     @PostMapping("/create")
     public ResponseEntity<PaymentResponse> createPayment(
-            @RequestBody PaymentRequest request
-    ) {
+            @RequestBody PaymentRequest request,
+            Authentication authentication) {
 
-        System.out.println("PAYMENT REQUEST = " + request);
-
-        PaymentResponse response = paymentService.createPayment(request);
-
-        System.out.println("GENIUSPAY RESPONSE = " + response);
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(
+                paymentService.createPayment(request, authentication)
+        );
     }
+
+
     @GetMapping("/verify")
     public ResponseEntity<PaymentResponse> verifyPayment(
             @RequestParam String reference) {
 
-        return ResponseEntity.ok(paymentService.verifyPayment(reference));
+        return ResponseEntity.ok(
+                paymentService.verifyPayment(reference)
+        );
     }
 }
