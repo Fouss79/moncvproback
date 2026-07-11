@@ -6,6 +6,7 @@ import Fouss.moncvproback.entity.Payment;
 import Fouss.moncvproback.entity.User;
 import Fouss.moncvproback.repository.PaymentRepository;
 import Fouss.moncvproback.repository.UserRepository;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -123,6 +124,46 @@ public class PaymentService {
                     }
                 })
                 .block();
+    }
+    public void handleWebhook(String event, String payload) {
+
+        try {
+
+            ObjectMapper mapper = new ObjectMapper();
+
+            JsonNode json = mapper.readTree(payload);
+
+            JsonNode data = json.get("data");
+
+            String reference = data.get("reference").asText();
+            String status = data.get("status").asText();
+
+
+            Payment payment = paymentRepository
+                    .findByReference(reference)
+                    .orElseThrow(() ->
+                            new RuntimeException("Paiement introuvable")
+                    );
+
+
+            if ("payment.success".equals(event)
+                    && "completed".equalsIgnoreCase(status)) {
+
+                payment.setStatus("SUCCESS");
+
+            } else if ("payment.failed".equals(event)) {
+
+                payment.setStatus("FAILED");
+            }
+
+
+            paymentRepository.save(payment);
+
+
+        } catch(Exception e) {
+
+            throw new RuntimeException(e);
+        }
     }
     public PaymentResponse verifyPayment(String reference) {
 
