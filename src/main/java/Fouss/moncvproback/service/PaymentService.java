@@ -40,8 +40,7 @@ public class PaymentService {
 
     @Value("${payment.error.url}")
     private String errorUrl;
-    @Value("${geniuspay.api.verify-url}")
-    private String verifyUrl;
+
     @Value("${geniuspay.webhook.secret}")
     private String webhookSecret;
 
