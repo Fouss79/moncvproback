@@ -41,4 +41,4 @@ target/
 
 ### OS ###
 Thumbs.db
-.DS_Store
+.DS_Storesrc/main/resources/application.properties
