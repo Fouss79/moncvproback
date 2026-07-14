@@ -75,6 +75,7 @@ public class SecurityConfig {
 
                         // ✅ Webhook GeniusPay
                         .requestMatchers("/api/payments/webhook").permitAll()
+                        .requestMatchers("/api/ai/**").permitAll()
 
                         .anyRequest().authenticated()
                 )

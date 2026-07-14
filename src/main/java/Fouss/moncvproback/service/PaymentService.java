@@ -125,7 +125,7 @@ public class PaymentService {
                                     request.getDescription()
                             );
 
-                            payment.setStatus("COMPLETED");
+                            payment.setStatus("PENDING");
 
                             payment.setCustomerEmail(
                                     request.getCustomer().getEmail()
