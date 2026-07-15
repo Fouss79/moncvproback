@@ -40,10 +40,7 @@ public class CvController {
         return ResponseEntity.ok(cvService.createCv(userId, cv));
     }
 
-    @PostMapping("/import")
-    public String importCv(@RequestParam MultipartFile file) {
-        return cvImportService.importCv(file);
-    }
+
 
     @PostMapping("/upload-photo")
     public ResponseEntity<String> uploadPhoto(

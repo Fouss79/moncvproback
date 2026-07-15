@@ -16,13 +16,13 @@ public class CvRequestDTO {
 
     private ContactDTO contact;
 
-    private List<String> competences;
+    private List<SkillDTO> competences;
 
     private List<String> logiciels;
 
     private List<String> softSkills;
 
-    private List<String> langues;
+    private List<SkillDTO> langues;
 
     private List<String> interets;
 
@@ -47,6 +47,15 @@ public class CvRequestDTO {
         private String linkedin;
         private String github;
         private String site;
+    }
+
+
+
+    @Data
+    public static class SkillDTO {
+
+        private String nom;
+        private String niveau;
     }
 
 
