@@ -1,6 +1,7 @@
 package Fouss.moncvproback.service;
 
 import Fouss.moncvproback.dto.CvRequestDTO;
+import Fouss.moncvproback.exception.AiServiceUnavailableException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -9,13 +10,17 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import reactor.util.retry.Retry;
 
 @Service
 @RequiredArgsConstructor
@@ -48,21 +53,65 @@ public class MistralService {
         );
 
 
-        JsonNode response = webClient.post()
-                .uri(apiUrl)
-                .header(
-                        HttpHeaders.AUTHORIZATION,
-                        "Bearer " + apiKey
-                )
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(body)
-                .retrieve()
-                .bodyToMono(JsonNode.class)
-                .block();
+        JsonNode response;
+        try {
+            response = webClient.post()
+                    .uri(apiUrl)
+                    .header(
+                            HttpHeaders.AUTHORIZATION,
+                            "Bearer " + apiKey
+                    )
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(body)
+                    .retrieve()
+                    .bodyToMono(JsonNode.class)
+                    // ⚠️ Absorbe les échecs réseau/DNS transitoires (ex: le
+                    // cache DNS interne de Netty qui reste bloqué sur un
+                    // échec ponctuel survenu au démarrage du serveur — le
+                    // symptôme classique "ça marche après un redémarrage").
+                    // 3 tentatives, backoff 2s/4s/8s. On ne retente PAS les
+                    // erreurs HTTP 4xx (hors 429) : une clé API invalide ou
+                    // une requête malformée ne sera jamais corrigée par un
+                    // simple réessai.
+                    .retryWhen(
+                            Retry.backoff(3, Duration.ofSeconds(2))
+                                    .filter(this::estErreurTransitoire)
+                                    // Sans ceci, Reactor enveloppe l'échec final
+                                    // dans un RetryExhaustedException générique,
+                                    // et les catch WebClientRequestException /
+                                    // WebClientResponseException ci-dessous ne
+                                    // matcheraient plus : on repropage donc
+                                    // l'exception d'origine telle quelle.
+                                    .onRetryExhaustedThrow((spec, signal) -> signal.failure())
+                    )
+                    .block();
+        } catch (WebClientRequestException e) {
+            // Erreur AVANT même d'atteindre Mistral : DNS injoignable,
+            // pas de connexion internet, timeout réseau, pare-feu...
+            // (ex: DnsNameResolverTimeoutException sur api.mistral.ai)
+            // — persiste malgré les 3 tentatives de retry ci-dessus.
+            throw new AiServiceUnavailableException(
+                    "Le service IA est temporairement injoignable (problème de connexion réseau). Réessayez dans quelques instants.",
+                    e
+            );
+        } catch (WebClientResponseException e) {
+            // Mistral a répondu, mais avec un code d'erreur HTTP
+            // (401 clé invalide, 429 quota dépassé, 5xx panne côté Mistral...)
+            throw new AiServiceUnavailableException(
+                    "Le service IA a renvoyé une erreur (code %d). Réessayez plus tard.".formatted(
+                            e.getStatusCode().value()),
+                    e
+            );
+        } catch (Exception e) {
+            throw new AiServiceUnavailableException(
+                    "Erreur inattendue lors de l'appel au service IA. Réessayez dans quelques instants.",
+                    e
+            );
+        }
 
 
         if (response == null) {
-            throw new RuntimeException("Réponse Mistral vide");
+            throw new AiServiceUnavailableException("Réponse vide du service IA. Réessayez dans quelques instants.");
         }
 
 
@@ -88,6 +137,27 @@ public class MistralService {
         }
 
         return content;
+    }
+
+
+    /**
+     * Détermine si une erreur mérite un nouvel essai :
+     * - Erreurs réseau/DNS (WebClientRequestException) : OUI — c'est
+     *   exactement le cas du cache DNS Netty bloqué sur un échec ponctuel.
+     * - 429 (quota dépassé) ou 5xx (panne côté Mistral) : OUI, ça peut se
+     *   résorber tout seul en quelques secondes.
+     * - 4xx hors 429 (401 clé invalide, 400 requête malformée...) : NON —
+     *   réessayer ne changera rien, c'est une erreur de configuration/appel.
+     */
+    private boolean estErreurTransitoire(Throwable t) {
+        if (t instanceof WebClientRequestException) {
+            return true;
+        }
+        if (t instanceof WebClientResponseException wcre) {
+            int status = wcre.getStatusCode().value();
+            return status == 429 || status >= 500;
+        }
+        return false;
     }
 
 
@@ -182,6 +252,43 @@ public class MistralService {
                 .collect(Collectors.joining(", "));
 
 
+        // ⚠️ Cette liste DOIT rester synchronisée avec VERBES_ACTION dans
+        // lib/atsVerbes.js (frontend, utilisé par ExperienceList.jsx et
+        // AnalyseCV.jsx pour le score ATS). Volontairement large (tous
+        // domaines) pour ne pas contraindre l'IA à recycler toujours les
+        // mêmes 20 verbes ; exclut délibérément les formulations faibles
+        // ("participé à", "contribué à", "responsable de"...).
+        String verbesAutorises = String.join(", ",
+                // Développement / Technique
+                "développé", "conçu", "créé", "implémenté", "déployé",
+                "automatisé", "codé", "testé", "intégré", "migré",
+                "architecturé", "optimisé", "sécurisé", "digitalisé",
+                "modernisé", "maintenu",
+                // Management / Leadership
+                "dirigé", "géré", "managé", "encadré", "supervisé",
+                "coordonné", "piloté", "animé", "fédéré", "mobilisé",
+                "formé", "recruté", "mentoré", "délégué",
+                // Commercial / Vente
+                "négocié", "prospecté", "vendu", "fidélisé", "conquis",
+                "signé", "conclu", "closé",
+                // Marketing / Communication
+                "lancé", "promu", "communiqué", "rédigé", "publié", "organisé",
+                // Finance / Gestion
+                "budgété", "audité", "analysé", "contrôlé", "réduit",
+                "économisé", "arbitré",
+                // Opérations / Process
+                "structuré", "standardisé", "industrialisé", "rationalisé",
+                "simplifié", "harmonisé", "fiabilisé",
+                // Projet
+                "planifié", "exécuté", "livré", "suivi", "mis en place",
+                // Impact / Résultats
+                "augmenté", "amélioré", "renforcé", "consolidé", "accéléré",
+                "multiplié", "doublé", "triplé", "transformé",
+                // Impulsion / Construction
+                "établi", "instauré", "initié", "impulsé", "construit",
+                "bâti", "conduit", "mené", "orchestré", "élaboré"
+        );
+
         String posteVise = (cv.getTitre() != null && !cv.getTitre().isBlank())
                 ? cv.getTitre()
                 : "le poste actuel du candidat";
@@ -198,9 +305,17 @@ public class MistralService {
         - Générer un profil professionnel impactant et adapté au métier du
           candidat (ne bascule jamais vers un autre métier que celui indiqué
           par son titre/poste et ses expériences réelles).
-        - Reformuler les expériences avec des verbes d'action et des résultats
-          chiffrés quand l'information le permet, sans jamais inventer de
-          chiffres, dates, entreprises ou faits absents du texte fourni.
+        - Reformuler chaque ligne de responsabilité pour qu'elle commence
+          IMPÉRATIVEMENT par l'un des verbes d'action suivants (aucun autre
+          verbe de début de phrase n'est autorisé, pour rester compatible
+          avec notre outil interne de notation ATS) :
+          %s.
+          Si aucun de ces verbes ne correspond exactement à l'action décrite,
+          choisis le plus proche sémantiquement dans cette liste plutôt que
+          d'en inventer un autre.
+        - Ajoute des résultats chiffrés quand l'information le permet, sans
+          jamais inventer de chiffres, dates, entreprises ou faits absents du
+          texte fourni.
         - Mettre en valeur les compétences et réalisations propres à son
           domaine (commercial, technique, ou autre selon le cas).
         - Corriger les erreurs linguistiques et de formulation.
@@ -226,6 +341,7 @@ public class MistralService {
               "poste": "",
               "entreprise": "",
               "dates": "",
+              "duree": "",
               "responsabilites": [""]
             }
           ],
@@ -238,8 +354,8 @@ public class MistralService {
           partir du contexte : "Débutant", "Intermédiaire", "Avancé" ou
           "Expert").
         - "experiences" reformule chaque expérience fournie (même nombre
-          d'expériences en entrée qu'en sortie), en gardant poste, entreprise
-          et dates identiques, et en réécrivant uniquement les
+          d'expériences en entrée qu'en sortie), en gardant poste, entreprise,
+          dates et durée identiques, et en réécrivant uniquement les
           responsabilités.
         - "resume" est une synthèse en 2-3 phrases des points forts du
           candidat pour le poste visé.
@@ -295,6 +411,7 @@ public class MistralService {
         """
                 .formatted(
                         posteVise,
+                        verbesAutorises,
 
                         cv.getNom(),
                         cv.getPrenom(),
@@ -406,7 +523,10 @@ public class MistralService {
             node.path("suggestions").forEach(n -> result.add(n.asText()));
             return result;
         } catch (Exception e) {
-            throw new RuntimeException("Impossible d'analyser les suggestions IA de compétences", e);
+            throw new AiServiceUnavailableException(
+                    "Le service IA a renvoyé une réponse invalide pour les suggestions de compétences. Réessayez.",
+                    e
+            );
         }
     }
 }
