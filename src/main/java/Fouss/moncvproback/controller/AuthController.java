@@ -5,14 +5,11 @@ import Fouss.moncvproback.dto.RegisterRequest;
 import Fouss.moncvproback.entity.User;
 import Fouss.moncvproback.repository.UserRepository;
 import Fouss.moncvproback.service.AuthService;
-import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
+import org.springframework.web.servlet.view.RedirectView;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -21,36 +18,43 @@ public class AuthController {
     private final AuthService authService;
     private final UserRepository userRepository;
 
-    public AuthController(AuthService authService,UserRepository userRepository) {
+    // Injecté depuis application.properties (ou variable d'environnement)
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
+
+    public AuthController(AuthService authService, UserRepository userRepository) {
         this.authService = authService;
-        this.userRepository=userRepository;
+        this.userRepository = userRepository;
     }
+
     @GetMapping("/me")
     public ResponseEntity<User> me(Authentication authentication) {
-
         String email = authentication.getName();
-
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        System.out.println(user.getId());
         return ResponseEntity.ok(user);
     }
+
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         return ResponseEntity.ok(authService.register(request));
     }
+
     @GetMapping("/activate")
-    public String activate(@RequestParam String token) {
+    public RedirectView activate(@RequestParam String token) {
+        try {
+            User user = userRepository.findByVerificationToken(token)
+                    .orElseThrow(() -> new RuntimeException("Token invalide"));
 
-        User user = userRepository.findByVerificationToken(token)
-                .orElseThrow(() -> new RuntimeException("Token invalide"));
+            user.setEnabled(true);
+            user.setVerificationToken(null);
+            userRepository.save(user);
 
-        user.setEnabled(true);
-        user.setVerificationToken(null);
+            return new RedirectView(frontendUrl + "/login?activated=true");
 
-        userRepository.save(user);
-
-        return "Compte activé avec succès";
+        } catch (RuntimeException e) {
+            return new RedirectView(frontendUrl + "/login?activated=false");
+        }
     }
 
     @PostMapping("/login")
