@@ -208,4 +208,7 @@ public class PaymentService {
                 .orElseThrow(() ->
                         new RuntimeException("Paiement introuvable"));
     }
+    public boolean hasCompletedPayment(String email) {
+        return paymentRepository.existsByUser_EmailAndStatus(email, "COMPLETED");
+    }
 }

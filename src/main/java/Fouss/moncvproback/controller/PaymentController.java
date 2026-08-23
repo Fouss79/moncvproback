@@ -66,4 +66,9 @@ public class PaymentController {
         );
     }
 
+    @GetMapping("/status/me")
+    public ResponseEntity<Map<String, Boolean>> getMyStatus(Authentication authentication) {
+        boolean paid = paymentService.hasCompletedPayment(authentication.getName());
+        return ResponseEntity.ok(Map.of("paid", paid));
+    }
 }
