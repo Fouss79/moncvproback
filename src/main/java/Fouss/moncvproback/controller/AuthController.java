@@ -11,7 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.reactive.result.view.RedirectView;
 
 import java.util.Map;
 
@@ -40,10 +39,8 @@ public class AuthController {
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         return ResponseEntity.ok(authService.register(request));
     }
-
-
     @GetMapping("/activate")
-    public RedirectView activate(@RequestParam String token) {
+    public String activate(@RequestParam String token) {
 
         User user = userRepository.findByVerificationToken(token)
                 .orElseThrow(() -> new RuntimeException("Token invalide"));
@@ -53,8 +50,7 @@ public class AuthController {
 
         userRepository.save(user);
 
-        // Redirige vers la page de login du frontend
-        return new RedirectView("https://mon-cv-pro-dypd.vercel.app/login?activated=true");
+        return "Compte activé avec succès";
     }
 
     @PostMapping("/login")
