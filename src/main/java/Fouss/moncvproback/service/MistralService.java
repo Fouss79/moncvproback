@@ -14,11 +14,7 @@ import org.springframework.web.reactive.function.client.WebClientRequestExceptio
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 import reactor.util.retry.Retry;
 
@@ -253,7 +249,13 @@ public class MistralService {
         String loisirsStr = Optional.ofNullable(cv.getLoisirs())
                 .orElse(Collections.emptyList())
                 .stream()
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
+                .collect(Collectors.joining(", "));
+
+        String interetsStr = Optional.ofNullable(cv.getInterets())
+                .orElse(Collections.emptyList())
+                .stream()
+                .filter(Objects::nonNull)
                 .collect(Collectors.joining(", "));
 
         // ⚠️ Cette liste DOIT rester synchronisée avec VERBES_ACTION dans
@@ -404,6 +406,8 @@ public class MistralService {
         Loisirs / Centres d'intérêt :
         %s
                 
+        Intérêts :
+        %s       
                 
         Formations :
         %s
@@ -443,6 +447,7 @@ public class MistralService {
                         languesStr,
 
                         loisirsStr,
+                        interetsStr,
 
                         formations,
 
