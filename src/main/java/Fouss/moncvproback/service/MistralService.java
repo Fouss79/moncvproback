@@ -250,6 +250,9 @@ public class MistralService {
                         ? "%s (%s)".formatted(l.getNom(), l.getNiveau())
                         : l.getNom())
                 .collect(Collectors.joining(", "));
+        String loisirsStr = String.join(", ",
+                Optional.ofNullable(cv.getLoisirs())
+                        .orElse(Collections.emptyList()));
 
 
         // ⚠️ Cette liste DOIT rester synchronisée avec VERBES_ACTION dans
@@ -331,23 +334,23 @@ public class MistralService {
 
         Retourne uniquement un JSON valide avec exactement cette structure :
 
-        {
-          "profil": "",
-          "competences": [
-            { "nom": "", "niveau": "" }
-          ],
-          "experiences": [
-            {
-              "poste": "",
-              "entreprise": "",
-              "dates": "",
-              "duree": "",
-              "responsabilites": [""]
-            }
-          ],
-          "resume": ""
-        }
-
+                {
+                  "profil": "",
+                  "competences": [
+                    { "nom": "", "niveau": "" }
+                  ],
+                  "experiences": [
+                    {
+                      "poste": "",
+                      "entreprise": "",
+                      "dates": "",
+                      "duree": "",
+                      "responsabilites": [""]
+                    }
+                  ],
+                  "loisirs": [""],
+                  "resume": ""
+                }
         Où :
         - "competences" reprend et enrichit la liste de compétences fournie
           (conserve le "niveau" d'origine s'il existe, sinon estime-le à
@@ -357,6 +360,10 @@ public class MistralService {
           d'expériences en entrée qu'en sortie), en gardant poste, entreprise,
           dates et durée identiques, et en réécrivant uniquement les
           responsabilités.
+          - "loisirs" reprend tous les loisirs / centres d'intérêt fournis par le candidat.
+                  - Ne jamais inventer de loisirs.
+                  - Ne supprimer aucun loisir fourni.
+                  - Conserver le sens des loisirs renseignés.
         - "resume" est une synthèse en 2-3 phrases des points forts du
           candidat pour le poste visé.
 
@@ -391,8 +398,12 @@ public class MistralService {
 
         Langues :
         %s
-
-
+                
+                
+        Loisirs / Centres d'intérêt :
+        %s
+                
+                
         Formations :
         %s
 
@@ -430,7 +441,11 @@ public class MistralService {
 
                         languesStr,
 
+                        loisirsStr,
+
                         formations,
+
+                        experiences,
 
                         experiences,
 
