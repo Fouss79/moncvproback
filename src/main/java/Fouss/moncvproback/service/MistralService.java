@@ -250,10 +250,11 @@ public class MistralService {
                         ? "%s (%s)".formatted(l.getNom(), l.getNiveau())
                         : l.getNom())
                 .collect(Collectors.joining(", "));
-        String loisirsStr = String.join(", ",
-                Optional.ofNullable(cv.getLoisirs())
-                        .orElse(Collections.emptyList()));
-
+        String loisirsStr = Optional.ofNullable(cv.getLoisirs())
+                .orElse(Collections.emptyList())
+                .stream()
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.joining(", "));
 
         // ⚠️ Cette liste DOIT rester synchronisée avec VERBES_ACTION dans
         // lib/atsVerbes.js (frontend, utilisé par ExperienceList.jsx et
@@ -447,7 +448,6 @@ public class MistralService {
 
                         experiences,
 
-                        experiences,
 
                         String.join(", ",
                                 Optional.ofNullable(cv.getCertifications())
