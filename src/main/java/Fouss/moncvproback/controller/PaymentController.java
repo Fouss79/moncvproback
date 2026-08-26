@@ -1,13 +1,8 @@
 package Fouss.moncvproback.controller;
 
-import Fouss.moncvproback.dto.PaymentRequest;
-import Fouss.moncvproback.dto.PaymentResponse;
-import Fouss.moncvproback.dto.PaymentStatusResponse;
-import Fouss.moncvproback.entity.Payment;
 import Fouss.moncvproback.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -19,25 +14,27 @@ public class PaymentController {
 
     private final PaymentService paymentService;
 
-    // ✅ SUPPRIMÉ : "private PaymentRepository paymentRepository;" existait ici
-    // sans "final" et sans être utilisé dans la classe. Comme il n'était pas
-    // final, Lombok @RequiredArgsConstructor ne l'injectait pas : il serait
-    // resté "null" si jamais on l'avait utilisé (NullPointerException garanti
-    // au premier appel). Inutile ici puisque tout passe déjà par paymentService.
+    // ✅ SUPPRIMÉS — le paiement à l'unité (200 FCFA/téléchargement) est
+    // remplacé par l'abonnement. Les endpoints /create, /status et /status/me
+    // n'existent plus pour éviter que quelqu'un puisse encore déclencher un
+    // paiement à l'unité par erreur (ancien lien, ancien bookmark, etc.).
+    //
+    // Les 3 paiements déjà effectués restent en base (table "payment") pour
+    // l'historique — rien n'a été supprimé côté données, seulement les routes
+    // qui permettaient d'en créer de nouveaux.
+    //
+    // Si tu veux un jour consulter cet historique depuis un back-office, on
+    // pourra réintroduire un endpoint GET en lecture seule, réservé à un rôle
+    // ADMIN — mais plus d'endpoint de création ni de polling public.
 
-    @PostMapping("/create")
-    public ResponseEntity<PaymentResponse> createPayment(
-            @RequestBody PaymentRequest request,
-            Authentication authentication) {
-
-        return ResponseEntity.ok(
-                paymentService.createPayment(request, authentication)
-        );
-    }
-
+    /**
+     * Reste indispensable : c'est GeniusPay qui appelle cette URL, pour les
+     * abonnements Pro/Premium comme pour tout paiement encore en attente créé
+     * avant la bascule. On ne touche pas à cette route.
+     */
     @PostMapping("/webhook")
     public ResponseEntity<?> webhook(
-            @RequestHeader Map<String,String> headers,
+            @RequestHeader Map<String, String> headers,
             @RequestBody String payload
     ) {
 
@@ -50,41 +47,12 @@ public class PaymentController {
         if ("webhook.test".equals(event)) {
             return ResponseEntity.ok().build();
         }
+
         System.out.println("EVENT = " + event);
         System.out.println("PAYLOAD = " + payload);
 
         paymentService.handleWebhook(event, payload);
 
         return ResponseEntity.ok().build();
-    }
-
-    /**
-     * ✅ CORRIGÉ — Retourne un 404 avec message clair quand la référence
-     * n'existe pas, au lieu de laisser fuiter l'exception générique levée par
-     * getPaymentStatus() (probablement convertie en 400 par un handler global
-     * ailleurs dans le projet, d'où le "400 Bad Request" observé côté frontend).
-     *
-     * Ça ne résout pas la boucle infinie côté frontend, mais ça donne au moins
-     * une réponse claire et cohérente (404 = "introuvable", pas 400 = "requête
-     * invalide" — la requête, elle, était parfaitement valide).
-     */
-    @GetMapping("/status")
-    public ResponseEntity<?> getStatus(
-            @RequestParam String reference) {
-
-        try {
-            Payment payment = paymentService.getPaymentStatus(reference);
-            return ResponseEntity.ok(new PaymentStatusResponse(
-                    payment.getReference(), payment.getStatus()));
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(404).body(Map.of(
-                    "message", "Aucun paiement trouvé pour cette référence"));
-        }
-    }
-
-    @GetMapping("/status/me")
-    public ResponseEntity<Map<String, Boolean>> getMyStatus(Authentication authentication) {
-        boolean paid = paymentService.hasCompletedPayment(authentication.getName());
-        return ResponseEntity.ok(Map.of("paid", paid));
     }
 }
