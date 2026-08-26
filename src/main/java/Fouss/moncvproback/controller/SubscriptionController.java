@@ -56,7 +56,25 @@ public class SubscriptionController {
             return ResponseEntity.status(401).body(Map.of("message", "Non authentifié"));
         }
 
-        String planType = paymentService.getCurrentPlan(authentication.getName());
-        return ResponseEntity.ok(Map.of("planType", planType));
+        return ResponseEntity.ok(paymentService.getSubscriptionStatus(authentication.getName()));
+    }
+
+    /**
+     * ✅ NOUVEAU — À appeler juste avant de lancer generatePDF() côté
+     * frontend. Si le quota est dépassé, renvoie 403 avec un message clair ;
+     * le frontend ne doit générer le PDF QUE si cet appel réussit.
+     */
+    @PostMapping("/downloads/consume")
+    public ResponseEntity<?> consumeDownload(Authentication authentication) {
+        if (authentication == null) {
+            return ResponseEntity.status(401).body(Map.of("message", "Non authentifié"));
+        }
+
+        try {
+            paymentService.consumeDownload(authentication.getName());
+            return ResponseEntity.ok(paymentService.getSubscriptionStatus(authentication.getName()));
+        } catch (Fouss.moncvproback.exception.DownloadLimitExceededException e) {
+            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
+        }
     }
 }

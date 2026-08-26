@@ -43,6 +43,11 @@ public class Subscription {
 
     private long amountXof;
 
+    // ✅ NOUVEAU — Nombre de téléchargements déjà consommés sur CET abonnement.
+    // Repart naturellement à 0 à chaque nouveau cycle, puisqu'un renouvellement
+    // crée une nouvelle ligne Subscription (voir PaymentService).
+    private int downloadsUsed = 0;
+
     private LocalDateTime startDate;
     private LocalDateTime endDate;
 

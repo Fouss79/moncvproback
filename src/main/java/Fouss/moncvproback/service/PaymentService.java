@@ -6,6 +6,7 @@ import Fouss.moncvproback.entity.Payment;
 import Fouss.moncvproback.entity.Subscription;
 import Fouss.moncvproback.entity.User;
 import Fouss.moncvproback.enums.PlanType;
+import Fouss.moncvproback.exception.DownloadLimitExceededException;
 import Fouss.moncvproback.repository.PaymentRepository;
 import Fouss.moncvproback.repository.SubscriptionRepository;
 import Fouss.moncvproback.repository.UserRepository;
@@ -332,5 +333,81 @@ public class PaymentService {
                 .filter(sub -> sub.getEndDate() == null || sub.getEndDate().isAfter(LocalDateTime.now()))
                 .map(sub -> sub.getPlanType().name())
                 .orElse("FREE");
+    }
+
+    /**
+     * ✅ NOUVEAU — Abonnement actif en cours (non expiré), ou vide si FREE.
+     * Point d'entrée unique utilisé pour le plan ET le quota de téléchargement,
+     * pour être certain que les deux s'accordent toujours sur le même abonnement.
+     */
+    private java.util.Optional<Subscription> getActiveSubscription(String email) {
+        return subscriptionRepository
+                .findTopByUser_EmailAndStatusOrderByCreatedAtDesc(email, "ACTIVE")
+                .filter(sub -> sub.getEndDate() == null || sub.getEndDate().isAfter(LocalDateTime.now()));
+    }
+
+    /**
+     * ✅ NOUVEAU — Statut complet consommé par GET /api/subscriptions/me :
+     * plan actif + quota de téléchargements restants (null si illimité ou FREE).
+     */
+    public Fouss.moncvproback.dto.SubscriptionStatusResponse getSubscriptionStatus(String email) {
+
+        java.util.Optional<Subscription> active = getActiveSubscription(email);
+
+        if (active.isEmpty()) {
+            // FREE : aucun téléchargement possible, pas de notion de quota à afficher
+            return new Fouss.moncvproback.dto.SubscriptionStatusResponse(
+                    "FREE", false, null, null, null);
+        }
+
+        Subscription sub = active.get();
+        PlanType plan = sub.getPlanType();
+
+        if (plan.isUnlimitedDownloads()) {
+            return new Fouss.moncvproback.dto.SubscriptionStatusResponse(
+                    plan.name(), true, null, null, null);
+        }
+
+        int limit = plan.getDownloadLimit();
+        int used = sub.getDownloadsUsed();
+        int remaining = Math.max(0, limit - used);
+
+        return new Fouss.moncvproback.dto.SubscriptionStatusResponse(
+                plan.name(), false, used, limit, remaining);
+    }
+
+    /**
+     * ✅ NOUVEAU — À appeler juste avant de générer le PDF. Incrémente le
+     * compteur si le quota le permet, ou lève DownloadLimitExceededException
+     * sinon. Le contrôle du montant/quota reste entièrement côté serveur :
+     * le frontend ne fait que refléter ce que cette méthode autorise.
+     *
+     * ✅ Verrouillé contre la concurrence : l'incrémentation passe par un
+     * UPDATE atomique conditionnel en base (voir
+     * SubscriptionRepository.incrementDownloadsIfUnderLimit), donc deux
+     * clics simultanés ne peuvent jamais faire dépasser le quota d'une unité.
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public void consumeDownload(String email) {
+
+        Subscription sub = getActiveSubscription(email)
+                .orElseThrow(() -> new DownloadLimitExceededException(
+                        "Aucun abonnement actif. Passez à Pro ou Premium pour télécharger."));
+
+        PlanType plan = sub.getPlanType();
+
+        if (plan.isUnlimitedDownloads()) {
+            return; // Premium : pas de compteur à vérifier
+        }
+
+        int limit = plan.getDownloadLimit();
+
+        int updatedRows = subscriptionRepository.incrementDownloadsIfUnderLimit(sub.getId(), limit);
+
+        if (updatedRows == 0) {
+            throw new DownloadLimitExceededException(
+                    "Limite de " + limit + " téléchargements atteinte pour ce mois. "
+                            + "Passez à Premium pour un accès illimité.");
+        }
     }
 }
