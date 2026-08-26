@@ -4,7 +4,6 @@ import Fouss.moncvproback.dto.PaymentRequest;
 import Fouss.moncvproback.dto.PaymentResponse;
 import Fouss.moncvproback.dto.PaymentStatusResponse;
 import Fouss.moncvproback.entity.Payment;
-import Fouss.moncvproback.repository.PaymentRepository;
 import Fouss.moncvproback.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,8 +18,12 @@ import java.util.Map;
 public class PaymentController {
 
     private final PaymentService paymentService;
-    private PaymentRepository paymentRepository;
 
+    // ✅ SUPPRIMÉ : "private PaymentRepository paymentRepository;" existait ici
+    // sans "final" et sans être utilisé dans la classe. Comme il n'était pas
+    // final, Lombok @RequiredArgsConstructor ne l'injectait pas : il serait
+    // resté "null" si jamais on l'avait utilisé (NullPointerException garanti
+    // au premier appel). Inutile ici puisque tout passe déjà par paymentService.
 
     @PostMapping("/create")
     public ResponseEntity<PaymentResponse> createPayment(
@@ -54,16 +57,29 @@ public class PaymentController {
 
         return ResponseEntity.ok().build();
     }
+
+    /**
+     * ✅ CORRIGÉ — Retourne un 404 avec message clair quand la référence
+     * n'existe pas, au lieu de laisser fuiter l'exception générique levée par
+     * getPaymentStatus() (probablement convertie en 400 par un handler global
+     * ailleurs dans le projet, d'où le "400 Bad Request" observé côté frontend).
+     *
+     * Ça ne résout pas la boucle infinie côté frontend, mais ça donne au moins
+     * une réponse claire et cohérente (404 = "introuvable", pas 400 = "requête
+     * invalide" — la requête, elle, était parfaitement valide).
+     */
     @GetMapping("/status")
-    public PaymentStatusResponse getStatus(
+    public ResponseEntity<?> getStatus(
             @RequestParam String reference) {
 
-        Payment payment = paymentService.getPaymentStatus(reference);
-
-        return new PaymentStatusResponse(
-                payment.getReference(),
-                payment.getStatus()
-        );
+        try {
+            Payment payment = paymentService.getPaymentStatus(reference);
+            return ResponseEntity.ok(new PaymentStatusResponse(
+                    payment.getReference(), payment.getStatus()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(404).body(Map.of(
+                    "message", "Aucun paiement trouvé pour cette référence"));
+        }
     }
 
     @GetMapping("/status/me")
