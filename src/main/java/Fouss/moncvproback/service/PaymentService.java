@@ -3,8 +3,11 @@ package Fouss.moncvproback.service;
 import Fouss.moncvproback.dto.PaymentRequest;
 import Fouss.moncvproback.dto.PaymentResponse;
 import Fouss.moncvproback.entity.Payment;
+import Fouss.moncvproback.entity.Subscription;
 import Fouss.moncvproback.entity.User;
+import Fouss.moncvproback.enums.PlanType;
 import Fouss.moncvproback.repository.PaymentRepository;
+import Fouss.moncvproback.repository.SubscriptionRepository;
 import Fouss.moncvproback.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,6 +27,7 @@ public class PaymentService {
     private final WebClient webClient;
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
+    private final SubscriptionRepository subscriptionRepository; // ✅ NOUVEAU
 
 
     @Value("${geniuspay.api.url}")
@@ -158,6 +162,101 @@ public class PaymentService {
                 })
                 .block();
     }
+
+    /**
+     * ✅ NOUVEAU — Crée un paiement d'abonnement (Pro/Premium) au lieu d'un
+     * paiement à l'unité. Réutilise exactement le même appel GeniusPay que
+     * createPayment(), mais :
+     *  - le montant vient du PlanType (jamais du frontend)
+     *  - on ne force pas de paymentMethod => page de checkout GeniusPay
+     *    (le client choisit Wave/Orange/MTN/Carte lui-même)
+     *  - on enregistre une Subscription en PENDING en plus du Payment
+     */
+    public PaymentResponse createSubscriptionPayment(
+            String planTypeStr,
+            Authentication authentication
+    ) {
+
+        PlanType planType;
+        try {
+            planType = PlanType.valueOf(planTypeStr.toUpperCase());
+        } catch (Exception e) {
+            throw new RuntimeException("Plan inconnu. Valeurs acceptées : PRO, PREMIUM");
+        }
+
+        User user = userRepository
+                .findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+        PaymentRequest request = new PaymentRequest();
+        request.setAmount((int) planType.getAmountXof());
+        request.setDescription(planType.getDescription());
+        // Pas de setPaymentMethod(...) : le client choisit sur la page GeniusPay
+
+        PaymentRequest.Customer customer = new PaymentRequest.Customer();
+        customer.setEmail(user.getEmail());
+        customer.setName(user.getNom());
+        customer.setPhone(user.getPhone());
+        request.setCustomer(customer);
+
+        request.setSuccess_url(successUrl);
+        request.setError_url(errorUrl);
+
+        System.out.println("SUBSCRIPTION PAYMENT REQUEST = " + request);
+
+        return webClient.post()
+                .uri(apiUrl)
+                .header("X-API-Key", apiKey)
+                .header("X-API-Secret", apiSecret)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .retrieve()
+                .onStatus(
+                        status -> status.isError(),
+                        response -> response.bodyToMono(String.class)
+                                .map(error -> {
+                                    System.out.println("ERREUR GENIUSPAY = " + error);
+                                    return new RuntimeException("Erreur GeniusPay : " + error);
+                                })
+                )
+                .bodyToMono(String.class)
+                .map(json -> {
+
+                    System.out.println("REPONSE BRUTE GENIUSPAY (abonnement) = " + json);
+
+                    try {
+                        ObjectMapper mapper = new ObjectMapper();
+                        PaymentResponse response = mapper.readValue(json, PaymentResponse.class);
+
+                        if (response.getData() != null) {
+
+                            Subscription subscription = new Subscription(
+                                    user,
+                                    planType,
+                                    response.getData().getReference(),
+                                    planType.getAmountXof()
+                            );
+
+                            subscriptionRepository.save(subscription);
+
+                            System.out.println(
+                                    "ABONNEMENT ENREGISTRE (PENDING) : "
+                                            + subscription.getPaymentReference()
+                            );
+                        }
+
+                        return response;
+
+                    } catch (Exception e) {
+                        System.out.println(
+                                "ERREUR PARSING REPONSE GENIUSPAY (abonnement) = " + e.getMessage()
+                        );
+                        throw new RuntimeException(e);
+                    }
+                })
+                .block();
+    }
+
     public void handleWebhook(String event, String payload) {
 
         try {
@@ -174,41 +273,64 @@ public class PaymentService {
 
             String reference = data.get("reference").asText();
 
+            // ✅ On tente d'abord de trouver un Payment (paiement ponctuel existant),
+            // PUIS un Subscription (nouveau flux abonnement). Une transaction ne
+            // peut correspondre qu'à l'un des deux, selon comment elle a été créée.
+            paymentRepository.findByReference(reference).ifPresent(payment -> {
+                if ("payment.success".equals(event)) {
+                    payment.setStatus("COMPLETED");
+                    payment.setCompletedAt(LocalDateTime.now());
+                } else if ("payment.failed".equals(event)) {
+                    payment.setStatus("FAILED");
+                }
+                paymentRepository.save(payment);
+            });
 
-            Payment payment = paymentRepository
-                    .findByReference(reference)
-                    .orElseThrow(() ->
-                            new RuntimeException("Paiement introuvable")
+            subscriptionRepository.findByPaymentReference(reference).ifPresent(subscription -> {
+                if ("payment.success".equals(event)) {
+                    subscription.setStatus("ACTIVE");
+                    subscription.setStartDate(LocalDateTime.now());
+                    subscription.setEndDate(
+                            LocalDateTime.now().plusDays(subscription.getPlanType().getDurationDays())
                     );
+                } else if ("payment.failed".equals(event)
+                        || "payment.cancelled".equals(event)
+                        || "payment.expired".equals(event)) {
+                    subscription.setStatus("FAILED");
+                }
+                subscriptionRepository.save(subscription);
 
-
-            if ("payment.success".equals(event)) {
-
-                payment.setStatus("COMPLETED");
-                payment.setCompletedAt(LocalDateTime.now());
-
-            }
-            else if ("payment.failed".equals(event)) {
-
-                payment.setStatus("FAILED");
-
-            }
-
-
-            paymentRepository.save(payment);
-
+                System.out.println(
+                        "ABONNEMENT MIS A JOUR : " + subscription.getPaymentReference()
+                                + " -> " + subscription.getStatus()
+                );
+            });
 
         } catch(Exception e) {
             throw new RuntimeException(e);
         }
     }
+
     public Payment getPaymentStatus(String reference) {
 
         return paymentRepository.findByReference(reference)
                 .orElseThrow(() ->
                         new RuntimeException("Paiement introuvable"));
     }
+
     public boolean hasCompletedPayment(String email) {
         return paymentRepository.existsByUser_EmailAndStatus(email, "COMPLETED");
+    }
+
+    /**
+     * ✅ NOUVEAU — Retourne le plan actif de l'utilisateur ("FREE" si aucun
+     * abonnement ACTIVE en cours), à consommer par GET /api/subscriptions/me.
+     */
+    public String getCurrentPlan(String email) {
+        return subscriptionRepository
+                .findTopByUser_EmailAndStatusOrderByCreatedAtDesc(email, "ACTIVE")
+                .filter(sub -> sub.getEndDate() == null || sub.getEndDate().isAfter(LocalDateTime.now()))
+                .map(sub -> sub.getPlanType().name())
+                .orElse("FREE");
     }
 }
