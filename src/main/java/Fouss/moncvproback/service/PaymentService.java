@@ -324,6 +324,23 @@ public class PaymentService {
     }
 
     /**
+     * ✅ NOUVEAU — Vérification réutilisable côté serveur : à appeler en tout
+     * début de n'importe quel endpoint réservé aux abonnés (assistant IA,
+     * import de CV...). Lève une exception si l'utilisateur est en FREE,
+     * qu'il soit passé par le frontend ou qu'il appelle l'API directement
+     * (Postman, curl...) avec son propre token JWT.
+     *
+     * Contrairement à consumeDownload(), on ne touche à aucun compteur ici :
+     * on vérifie juste "a-t-il un abonnement actif", sans notion de quota.
+     */
+    public void requireActiveSubscription(String email) {
+        if (getActiveSubscription(email).isEmpty()) {
+            throw new DownloadLimitExceededException(
+                    "Cette fonctionnalité est réservée aux abonnés Pro ou Premium.");
+        }
+    }
+
+    /**
      * ✅ NOUVEAU — Retourne le plan actif de l'utilisateur ("FREE" si aucun
      * abonnement ACTIVE en cours), à consommer par GET /api/subscriptions/me.
      */
@@ -410,4 +427,17 @@ public class PaymentService {
                             + "Passez à Premium pour un accès illimité.");
         }
     }
+
+    /**
+     * ✅ NOUVEAU — À appeler en tout début de n'importe quel endpoint réservé
+     * aux abonnés Pro/Premium (import CV, assistant IA, etc.), en plus du
+     * verrou déjà fait côté frontend. Ne fait rien si l'utilisateur a un
+     * abonnement actif ; lève une exception sinon, à catcher dans le
+     * contrôleur pour renvoyer un 403 avec un message clair.
+     *
+     * Volontairement permissif sur le plan (PRO comme PREMIUM suffisent) :
+     * contrairement au téléchargement, l'import CV et l'assistant IA ne sont
+     * pas limités en nombre, juste réservés aux abonnés.
+     */
+
 }
