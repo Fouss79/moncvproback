@@ -553,6 +553,15 @@ public class MistralService {
     /**
      * Génère une lettre de motivation personnalisée à partir
      * du CV du candidat et éventuellement d'une offre d'emploi.
+     *
+     * ✅ CORRIGÉ — Le prompt demandait auparavant à l'IA de générer une
+     * structure "coordonnées / objet / formule d'appel / ...", ce qui
+     * produisait un second en-tête (souvent avec des placeholders du style
+     * "[Adresse personnelle]") EN PLUS de celui déjà affiché séparément par
+     * le frontend (LettreMotivationPage.jsx) à partir des vraies données du
+     * CV. Le prompt interdit maintenant explicitement à l'IA de générer cet
+     * en-tête : elle ne produit que le corps du message, à partir de la
+     * formule d'appel.
      */
     public String generateCoverLetter(
             CvRequestDTO cv,
@@ -687,12 +696,20 @@ public class MistralService {
             - Le ton doit être %s.
             - La lettre doit rester professionnelle et convaincante.
             - Elle doit tenir sur environ une page.
-            - Utilise une structure professionnelle :
-              coordonnées / objet / formule d'appel / introduction /
-              motivation / adéquation avec le poste / conclusion.
+            - ⚠️ NE GÉNÈRE JAMAIS l'en-tête de la lettre : ni les
+              coordonnées de l'expéditeur (nom, adresse, email,
+              téléphone), ni la date, ni la ligne "Objet : ...", ni
+              l'adresse du destinataire. Ces éléments sont déjà affichés
+              séparément par l'application, AVANT ton texte — les
+              reproduire créerait un doublon visible pour l'utilisateur.
+            - Commence directement par la formule d'appel ("Madame,
+              Monsieur," ou équivalent adapté), puis enchaîne avec
+              l'introduction / la motivation / l'adéquation avec le poste
+              / la conclusion et la formule de politesse finale.
             - Ne mets pas de Markdown.
             - Ne mets pas de titre du type "Lettre de motivation".
-            - Retourne uniquement le texte final de la lettre.
+            - Retourne uniquement le texte final de la lettre (à partir de
+              la formule d'appel, sans rien avant).
 
             =========================
             INFORMATIONS CANDIDAT
