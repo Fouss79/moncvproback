@@ -5,8 +5,7 @@ package Fouss.moncvproback.enums;
  * Ne jamais faire confiance à un montant/quota envoyé par le frontend.
  */
 public enum PlanType {
-
-    PRO(2500, 30, "Abonnement Pro - 1 mois", 5),
+    PRO(200, 30, "Abonnement Pro - 1 mois", 5),
     PREMIUM(6000, 365, "Abonnement Premium - 1 an", null); // null = illimité
 
     private final long amountXof;
