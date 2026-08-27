@@ -283,6 +283,8 @@ public class PaymentService {
                     payment.setCompletedAt(LocalDateTime.now());
                 } else if ("payment.failed".equals(event)) {
                     payment.setStatus("FAILED");
+                } else if ("payment.refunded".equals(event)) {
+                    payment.setStatus("REFUNDED");
                 }
                 paymentRepository.save(payment);
             });
@@ -295,9 +297,15 @@ public class PaymentService {
                             LocalDateTime.now().plusDays(subscription.getPlanType().getDurationDays())
                     );
                 } else if ("payment.failed".equals(event)
-                        || "payment.cancelled".equals(event)
-                        || "payment.expired".equals(event)) {
+                        || "payment.cancelled".equals(event)) {
                     subscription.setStatus("FAILED");
+                } else if ("payment.refunded".equals(event)) {
+                    // ✅ NOUVEAU — Un abonnement remboursé après coup ne doit
+                    // plus rester ACTIVE : on coupe l'accès immédiatement.
+                    // ("payment.expired" n'existe pas dans le catalogue réel
+                    // d'événements GeniusPay — remplacé par payment.refunded,
+                    // qui lui existe bien et couvre un cas réel à gérer.)
+                    subscription.setStatus("REFUNDED");
                 }
                 subscriptionRepository.save(subscription);
 
