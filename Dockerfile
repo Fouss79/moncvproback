@@ -2,7 +2,17 @@ FROM eclipse-temurin:21-jdk
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y maven
+# ✅ NOUVEAU — tesseract-ocr (binaire système) + données de langue.
+# La dépendance Maven "tess4j" (déjà dans pom.xml) n'est qu'un wrapper Java :
+# elle a besoin du vrai binaire Tesseract installé ici pour fonctionner.
+# tesseract-ocr-fra : CV majoritairement en français.
+# tesseract-ocr-eng : quelques CV/mentions en anglais.
+RUN apt-get update && apt-get install -y \
+    maven \
+    tesseract-ocr \
+    tesseract-ocr-fra \
+    tesseract-ocr-eng \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY . .
 
