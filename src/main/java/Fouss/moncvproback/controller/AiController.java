@@ -1,5 +1,6 @@
 package Fouss.moncvproback.controller;
 
+import Fouss.moncvproback.dto.CoverLetterRequestDTO;
 import Fouss.moncvproback.dto.CvRequestDTO;
 import Fouss.moncvproback.exception.DownloadLimitExceededException;
 import Fouss.moncvproback.service.MistralService;
@@ -19,6 +20,7 @@ public class AiController {
 
     private final MistralService mistralService;
     private final PaymentService paymentService;
+
 
     /**
      * ✅ NOUVEAU — Réservé aux abonnés Pro/Premium ("Suggestions IA
@@ -46,6 +48,43 @@ public class AiController {
         System.out.println("CV reçu = " + cv);
 
         return ResponseEntity.ok(result);
+
+
     }
 
-}
+
+
+        @PostMapping("/generate-cover-letter")
+        public ResponseEntity<?> generateCoverLetter(
+                @RequestBody CoverLetterRequestDTO request
+        ) {
+
+            if (request.getCv() == null) {
+                return ResponseEntity.badRequest().body(
+                        Map.of(
+                                "message",
+                                "Les informations du CV sont obligatoires."
+                        )
+                );
+            }
+
+            String letter = mistralService.generateCoverLetter(
+                    request.getCv(),
+                    request.getPoste(),
+                    request.getEntreprise(),
+                    request.getOffre(),
+                    request.getTon(),
+                    request.getInformationsSupplementaires()
+            );
+
+            return ResponseEntity.ok(
+                    Map.of(
+                            "letter",
+                            letter
+                    )
+            );
+        }
+    }
+
+
+

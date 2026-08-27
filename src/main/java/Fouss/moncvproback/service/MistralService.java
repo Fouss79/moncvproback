@@ -549,4 +549,354 @@ public class MistralService {
             );
         }
     }
+
+    /**
+     * Génère une lettre de motivation personnalisée à partir
+     * du CV du candidat et éventuellement d'une offre d'emploi.
+     */
+    public String generateCoverLetter(
+            CvRequestDTO cv,
+            String poste,
+            String entreprise,
+            String offre,
+            String ton,
+            String informationsSupplementaires
+    ) {
+
+        List<CvRequestDTO.ExperienceDTO> experiences =
+                Optional.ofNullable(cv.getExperiences())
+                        .orElse(Collections.emptyList());
+
+        String experiencesStr = experiences.stream()
+                .map(exp -> """
+                    Poste : %s
+                    Entreprise : %s
+                    Période : %s
+                    Responsabilités :
+                    %s
+                    """.formatted(
+                        Optional.ofNullable(exp.getPoste()).orElse(""),
+                        Optional.ofNullable(exp.getEntreprise()).orElse(""),
+                        Optional.ofNullable(exp.getDates()).orElse(""),
+                        String.join("\n- ",
+                                Optional.ofNullable(exp.getResponsabilites())
+                                        .orElse(Collections.emptyList()))
+                ))
+                .collect(Collectors.joining("\n"));
+
+        String formationsStr =
+                Optional.ofNullable(cv.getFormations())
+                        .orElse(Collections.emptyList())
+                        .stream()
+                        .map(f -> "- %s - %s (%s)".formatted(
+                                Optional.ofNullable(f.getDiplome()).orElse(""),
+                                Optional.ofNullable(f.getEcole()).orElse(""),
+                                Optional.ofNullable(f.getAnnee()).orElse("")
+                        ))
+                        .collect(Collectors.joining("\n"));
+
+        String competencesStr =
+                Optional.ofNullable(cv.getCompetences())
+                        .orElse(Collections.emptyList())
+                        .stream()
+                        .map(c -> {
+                            if (c == null || c.getNom() == null) {
+                                return "";
+                            }
+
+                            if (c.getNiveau() != null && !c.getNiveau().isBlank()) {
+                                return "%s (%s)"
+                                        .formatted(c.getNom(), c.getNiveau());
+                            }
+
+                            return c.getNom();
+                        })
+                        .filter(s -> !s.isBlank())
+                        .collect(Collectors.joining(", "));
+
+        String languesStr =
+                Optional.ofNullable(cv.getLangues())
+                        .orElse(Collections.emptyList())
+                        .stream()
+                        .map(l -> {
+                            if (l == null || l.getNom() == null) {
+                                return "";
+                            }
+
+                            if (l.getNiveau() != null && !l.getNiveau().isBlank()) {
+                                return "%s (%s)"
+                                        .formatted(l.getNom(), l.getNiveau());
+                            }
+
+                            return l.getNom();
+                        })
+                        .filter(s -> !s.isBlank())
+                        .collect(Collectors.joining(", "));
+
+        String logicielsStr =
+                String.join(", ",
+                        Optional.ofNullable(cv.getLogiciels())
+                                .orElse(Collections.emptyList()));
+
+        String softSkillsStr =
+                String.join(", ",
+                        Optional.ofNullable(cv.getSoftSkills())
+                                .orElse(Collections.emptyList()));
+
+        String certificationsStr =
+                String.join(", ",
+                        Optional.ofNullable(cv.getCertifications())
+                                .orElse(Collections.emptyList()));
+
+        String projetsStr =
+                Optional.ofNullable(cv.getProjets())
+                        .orElse(Collections.emptyList())
+                        .stream()
+                        .map(p -> """
+                            Projet : %s
+                            Description : %s
+                            Technologies : %s
+                            """.formatted(
+                                Optional.ofNullable(p.getNom()).orElse(""),
+                                Optional.ofNullable(p.getDescription()).orElse(""),
+                                String.join(", ",
+                                        Optional.ofNullable(p.getTechnologies())
+                                                .orElse(Collections.emptyList()))
+                        ))
+                        .collect(Collectors.joining("\n"));
+
+        String prompt = """
+            Tu es un expert en recrutement et en rédaction de lettres
+            de motivation professionnelles.
+
+            Ta mission est de rédiger une lettre de motivation
+            personnalisée pour le candidat ci-dessous.
+
+            IMPORTANT :
+            - La lettre doit être naturelle et humaine.
+            - Elle doit être personnalisée au poste recherché.
+            - Si une entreprise est fournie, adapte la lettre à cette entreprise.
+            - Si une offre d'emploi est fournie, utilise ses informations
+              pour adapter précisément la candidature.
+            - Mets en avant les expériences et compétences réellement
+              présentes dans le CV.
+            - Ne jamais inventer d'expérience, de diplôme, de compétence,
+              de responsabilité, de chiffre ou d'information.
+            - Ne pas répéter inutilement le CV.
+            - Évite les phrases génériques et trop artificielles.
+            - Le ton doit être %s.
+            - La lettre doit rester professionnelle et convaincante.
+            - Elle doit tenir sur environ une page.
+            - Utilise une structure professionnelle :
+              coordonnées / objet / formule d'appel / introduction /
+              motivation / adéquation avec le poste / conclusion.
+            - Ne mets pas de Markdown.
+            - Ne mets pas de titre du type "Lettre de motivation".
+            - Retourne uniquement le texte final de la lettre.
+
+            =========================
+            INFORMATIONS CANDIDAT
+            =========================
+
+            Nom :
+            %s
+
+            Prénom :
+            %s
+
+            Titre / métier :
+            %s
+
+            Profil :
+            %s
+
+            Compétences :
+            %s
+
+            Logiciels :
+            %s
+
+            Soft Skills :
+            %s
+
+            Langues :
+            %s
+
+            Formations :
+            %s
+
+            Expériences :
+            %s
+
+            Certifications :
+            %s
+
+            Projets :
+            %s
+
+            =========================
+            CANDIDATURE
+            =========================
+
+            Poste recherché :
+            %s
+
+            Entreprise :
+            %s
+
+            Offre d'emploi :
+            %s
+
+            Informations supplémentaires du candidat :
+            %s
+
+            =========================
+
+            Rédige maintenant la lettre de motivation.
+            """.formatted(
+                Optional.ofNullable(ton)
+                        .filter(t -> !t.isBlank())
+                        .orElse("professionnel et naturel"),
+
+                Optional.ofNullable(cv.getNom()).orElse(""),
+                Optional.ofNullable(cv.getPrenom()).orElse(""),
+                Optional.ofNullable(cv.getTitre()).orElse(""),
+                Optional.ofNullable(cv.getProfil()).orElse(""),
+
+                competencesStr.isBlank()
+                        ? "Aucune"
+                        : competencesStr,
+
+                logicielsStr.isBlank()
+                        ? "Aucun"
+                        : logicielsStr,
+
+                softSkillsStr.isBlank()
+                        ? "Aucun"
+                        : softSkillsStr,
+
+                languesStr.isBlank()
+                        ? "Aucune"
+                        : languesStr,
+
+                formationsStr.isBlank()
+                        ? "Aucune"
+                        : formationsStr,
+
+                experiencesStr.isBlank()
+                        ? "Aucune"
+                        : experiencesStr,
+
+                certificationsStr.isBlank()
+                        ? "Aucune"
+                        : certificationsStr,
+
+                projetsStr.isBlank()
+                        ? "Aucun"
+                        : projetsStr,
+
+                Optional.ofNullable(poste)
+                        .filter(p -> !p.isBlank())
+                        .orElse(cv.getTitre() != null
+                                ? cv.getTitre()
+                                : ""),
+
+                Optional.ofNullable(entreprise)
+                        .filter(e -> !e.isBlank())
+                        .orElse(""),
+
+                Optional.ofNullable(offre)
+                        .filter(o -> !o.isBlank())
+                        .orElse("Aucune offre fournie"),
+
+                Optional.ofNullable(informationsSupplementaires)
+                        .filter(i -> !i.isBlank())
+                        .orElse("Aucune")
+        );
+
+        return generatePlainText(prompt);
+
+
+    }
+
+    private String generatePlainText(String prompt) {
+
+        Map<String, Object> body = Map.of(
+                "model", model,
+                "messages", List.of(
+                        Map.of(
+                                "role", "user",
+                                "content", prompt
+                        )
+                ),
+                "temperature", 0.7
+        );
+
+        JsonNode response;
+
+        try {
+
+            response = webClient.post()
+                    .uri(apiUrl)
+                    .header(
+                            HttpHeaders.AUTHORIZATION,
+                            "Bearer " + apiKey
+                    )
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(body)
+                    .retrieve()
+                    .bodyToMono(JsonNode.class)
+                    .retryWhen(
+                            Retry.backoff(3, Duration.ofSeconds(2))
+                                    .filter(this::estErreurTransitoire)
+                                    .onRetryExhaustedThrow(
+                                            (spec, signal) -> signal.failure()
+                                    )
+                    )
+                    .block();
+
+        } catch (WebClientRequestException e) {
+
+            throw new AiServiceUnavailableException(
+                    "Le service IA est temporairement injoignable. Réessayez dans quelques instants.",
+                    e
+            );
+
+        } catch (WebClientResponseException e) {
+
+            throw new AiServiceUnavailableException(
+                    "Le service IA a renvoyé une erreur (code %d). Réessayez plus tard."
+                            .formatted(e.getStatusCode().value()),
+                    e
+            );
+
+        } catch (Exception e) {
+
+            throw new AiServiceUnavailableException(
+                    "Erreur inattendue lors de l'appel au service IA.",
+                    e
+            );
+        }
+
+        if (response == null) {
+            throw new AiServiceUnavailableException(
+                    "Réponse vide du service IA."
+            );
+        }
+
+        String content = response
+                .path("choices")
+                .get(0)
+                .path("message")
+                .path("content")
+                .asText();
+
+        if (content == null || content.isBlank()) {
+            throw new AiServiceUnavailableException(
+                    "Le service IA n'a généré aucun contenu."
+            );
+        }
+
+        return content.trim();
+    }
 }
