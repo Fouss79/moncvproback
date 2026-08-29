@@ -329,26 +329,6 @@ public class MistralService {
           d'expérience, de formation ou de compétence qui ne figure pas dans
           les données ci-dessous.
 
-        ⚠️ CONTRAINTES DE LONGUEUR (impératif) :
-        Le CV final est imprimé sur UNE SEULE page A4 avec une mise en page
-        fixe. Un contenu trop long déborde de la page et casse visuellement
-        le CV. Respecte donc strictement ces limites, même si les données
-        fournies par le candidat sont plus volumineuses :
-        - "profil" : 35 à 55 mots maximum (2 à 3 phrases denses, jamais plus).
-        - Pour chaque expérience, garde AU MAXIMUM 3 lignes de
-          responsabilités dans "responsabilites" (sélectionne les 3 plus
-          impactantes/pertinentes pour le poste visé si le candidat en a
-          fourni davantage — ne les supprime pas silencieusement sans
-          sélection, choisis les meilleures).
-        - Chaque ligne de responsabilité : 15 mots maximum (une phrase
-          courte et percutante, pas un paragraphe).
-        - "competences" : 10 éléments maximum au total. Si la liste fournie
-          en contient plus, garde les 10 plus pertinentes pour le poste visé
-          plutôt que d'en inventer une sélection arbitraire.
-        - Ne rallonge jamais un contenu déjà concis fourni par le candidat
-          juste pour "faire plus complet" — la priorité absolue est de tenir
-          sur une page, pas la densité d'information.
-
         IMPORTANT :
         - Ne donne aucune explication.
         - Ne mets aucune phrase avant ou après.
@@ -375,12 +355,10 @@ public class MistralService {
                   "resume": ""
                 }
         Où :
-        - "competences" reprend la liste de compétences fournie, dans la
-          limite de 10 (voir contraintes de longueur ci-dessus — si plus de
-          10 sont fournies, garde les plus pertinentes pour le poste visé),
-          conserve le "niveau" d'origine s'il existe, sinon estime-le à
+        - "competences" reprend et enrichit la liste de compétences fournie
+          (conserve le "niveau" d'origine s'il existe, sinon estime-le à
           partir du contexte : "Débutant", "Intermédiaire", "Avancé" ou
-          "Expert".
+          "Expert").
         - "experiences" reformule chaque expérience fournie (même nombre
           d'expériences en entrée qu'en sortie), en gardant poste, entreprise,
           dates et durée identiques, et en réécrivant uniquement les
