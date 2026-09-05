@@ -48,9 +48,10 @@ public class MistralService {
                 "temperature", 0.7
         );
 
-
         JsonNode response;
+
         try {
+
             response = webClient.post()
                     .uri(apiUrl)
                     .header(
@@ -61,55 +62,70 @@ public class MistralService {
                     .bodyValue(body)
                     .retrieve()
                     .bodyToMono(JsonNode.class)
-                    // ⚠️ Absorbe les échecs réseau/DNS transitoires (ex: le
-                    // cache DNS interne de Netty qui reste bloqué sur un
-                    // échec ponctuel survenu au démarrage du serveur — le
-                    // symptôme classique "ça marche après un redémarrage").
-                    // 3 tentatives, backoff 2s/4s/8s. On ne retente PAS les
-                    // erreurs HTTP 4xx (hors 429) : une clé API invalide ou
-                    // une requête malformée ne sera jamais corrigée par un
-                    // simple réessai.
+
+                    // Retry des erreurs transitoires :
+                    // - erreur réseau
+                    // - DNS
+                    // - 429
+                    // - erreurs 5xx
                     .retryWhen(
-                            Retry.backoff(3, Duration.ofSeconds(2))
+                            Retry.backoff(2, Duration.ofSeconds(5))
+                                    .maxBackoff(Duration.ofSeconds(30))
+                                    .jitter(0.5)
                                     .filter(this::estErreurTransitoire)
-                                    // Sans ceci, Reactor enveloppe l'échec final
-                                    // dans un RetryExhaustedException générique,
-                                    // et les catch WebClientRequestException /
-                                    // WebClientResponseException ci-dessous ne
-                                    // matcheraient plus : on repropage donc
-                                    // l'exception d'origine telle quelle.
-                                    .onRetryExhaustedThrow((spec, signal) -> signal.failure())
+                                    .onRetryExhaustedThrow(
+                                            (spec, signal) -> signal.failure()
+                                    )
                     )
                     .block();
+
         } catch (WebClientRequestException e) {
-            // Erreur AVANT même d'atteindre Mistral : DNS injoignable,
-            // pas de connexion internet, timeout réseau, pare-feu...
-            // (ex: DnsNameResolverTimeoutException sur api.mistral.ai)
-            // — persiste malgré les 3 tentatives de retry ci-dessus.
+
+            // Erreur réseau avant d'atteindre Mistral
+            System.err.println("========================================");
+            System.err.println("❌ ERREUR RÉSEAU MISTRAL");
+            System.err.println("❌ MESSAGE : " + e.getMessage());
+            System.err.println("========================================");
+
             throw new AiServiceUnavailableException(
                     "Le service IA est temporairement injoignable (problème de connexion réseau). Réessayez dans quelques instants.",
                     e
             );
+
         } catch (WebClientResponseException e) {
-            // Mistral a répondu, mais avec un code d'erreur HTTP
-            // (401 clé invalide, 429 quota dépassé, 5xx panne côté Mistral...)
+
+            // Mistral a répondu avec une erreur HTTP
+            System.err.println("========================================");
+            System.err.println("❌ ERREUR MISTRAL");
+            System.err.println("❌ HTTP : " + e.getStatusCode().value());
+            System.err.println("❌ BODY : " + e.getResponseBodyAsString());
+            System.err.println("❌ HEADERS : " + e.getHeaders());
+            System.err.println("========================================");
+
             throw new AiServiceUnavailableException(
-                    "Le service IA a renvoyé une erreur (code %d). Réessayez plus tard.".formatted(
-                            e.getStatusCode().value()),
+                    "Le service IA a renvoyé une erreur (code %d). Réessayez plus tard."
+                            .formatted(e.getStatusCode().value()),
                     e
             );
+
         } catch (Exception e) {
+
+            System.err.println("========================================");
+            System.err.println("❌ ERREUR INATTENDUE MISTRAL");
+            System.err.println("❌ MESSAGE : " + e.getMessage());
+            System.err.println("========================================");
+
             throw new AiServiceUnavailableException(
                     "Erreur inattendue lors de l'appel au service IA. Réessayez dans quelques instants.",
                     e
             );
         }
 
-
         if (response == null) {
-            throw new AiServiceUnavailableException("Réponse vide du service IA. Réessayez dans quelques instants.");
+            throw new AiServiceUnavailableException(
+                    "Réponse vide du service IA. Réessayez dans quelques instants."
+            );
         }
-
 
         String content = response
                 .path("choices")
@@ -123,8 +139,7 @@ public class MistralService {
                 .replace("```", "")
                 .trim();
 
-
-// récupérer uniquement le JSON
+        // Récupérer uniquement le JSON
         int start = content.indexOf("{");
         int end = content.lastIndexOf("}");
 
@@ -134,7 +149,6 @@ public class MistralService {
 
         return content;
     }
-
 
     /**
      * Détermine si une erreur mérite un nouvel essai :
@@ -149,13 +163,16 @@ public class MistralService {
         if (t instanceof WebClientRequestException) {
             return true;
         }
+
         if (t instanceof WebClientResponseException wcre) {
             int status = wcre.getStatusCode().value();
-            return status == 429 || status >= 500;
+
+            // 5xx = problème temporaire côté Mistral
+            return status >= 500;
         }
+
         return false;
     }
-
 
 
     public String generateCv(CvRequestDTO cv) {
@@ -864,7 +881,9 @@ public class MistralService {
                     .retrieve()
                     .bodyToMono(JsonNode.class)
                     .retryWhen(
-                            Retry.backoff(3, Duration.ofSeconds(2))
+                            Retry.backoff(2, Duration.ofSeconds(5))
+                                    .maxBackoff(Duration.ofSeconds(30))
+                                    .jitter(0.5)
                                     .filter(this::estErreurTransitoire)
                                     .onRetryExhaustedThrow(
                                             (spec, signal) -> signal.failure()
@@ -874,12 +893,26 @@ public class MistralService {
 
         } catch (WebClientRequestException e) {
 
+            // Erreur réseau avant d'atteindre Mistral
+            System.err.println("========================================");
+            System.err.println("❌ ERREUR RÉSEAU MISTRAL");
+            System.err.println("❌ MESSAGE : " + e.getMessage());
+            System.err.println("========================================");
+
             throw new AiServiceUnavailableException(
                     "Le service IA est temporairement injoignable. Réessayez dans quelques instants.",
                     e
             );
 
         } catch (WebClientResponseException e) {
+
+            // Mistral a répondu avec une erreur HTTP
+            System.err.println("========================================");
+            System.err.println("❌ ERREUR MISTRAL");
+            System.err.println("❌ HTTP : " + e.getStatusCode().value());
+            System.err.println("❌ BODY : " + e.getResponseBodyAsString());
+            System.err.println("❌ HEADERS : " + e.getHeaders());
+            System.err.println("========================================");
 
             throw new AiServiceUnavailableException(
                     "Le service IA a renvoyé une erreur (code %d). Réessayez plus tard."
@@ -888,6 +921,11 @@ public class MistralService {
             );
 
         } catch (Exception e) {
+
+            System.err.println("========================================");
+            System.err.println("❌ ERREUR INATTENDUE MISTRAL");
+            System.err.println("❌ MESSAGE : " + e.getMessage());
+            System.err.println("========================================");
 
             throw new AiServiceUnavailableException(
                     "Erreur inattendue lors de l'appel au service IA.",
@@ -915,5 +953,4 @@ public class MistralService {
         }
 
         return content.trim();
-    }
-}
+    }}
